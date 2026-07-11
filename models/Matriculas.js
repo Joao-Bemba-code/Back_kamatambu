@@ -92,6 +92,6 @@ const Matriculas = sequelize.define("Matriculas", {
     timestamps: true,
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
-})
+});
 
 module.exports = Matriculas;

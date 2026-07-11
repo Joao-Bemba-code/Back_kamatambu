@@ -80,6 +80,6 @@ const Turmas = sequelize.define("Turmas", {
     timestamps: true,
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
-})
+});
 
 module.exports = Turmas;

@@ -13,7 +13,7 @@ var Users = sequelize.define("Users",{
     eAdmin:{
         type:Sequelize.BOOLEAN
     }
-});
+})
 
 module.exports={
     Users

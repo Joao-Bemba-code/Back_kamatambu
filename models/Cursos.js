@@ -59,6 +59,6 @@ const Cursos = sequelize.define("Cursos", {
     timestamps: true,
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
-})
+});
 
 module.exports = Cursos;
