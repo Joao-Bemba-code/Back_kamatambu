@@ -6,7 +6,7 @@ const { Cursos } = require("../models/index.js");
 router_cursos.get("/lista", async (req, res) => {
     try {
         var cursos = await Cursos.findAll({
-            attributes: ['id', 'Nome'],
+            attributes: ['id', 'Nome', 'Valor_curso'],
             order: [['Nome', 'ASC']]
         });
 
@@ -78,6 +78,7 @@ router_cursos.post("/", async (req, res) => {
             Edicao,
             Duracao,
             Carga_Horaria,
+            Valor_curso,
             Status
         } = req.body;
 
@@ -96,6 +97,7 @@ router_cursos.post("/", async (req, res) => {
             Edicao: Edicao || '1º',
             Duracao: Duracao || null,
             Carga_Horaria: Carga_Horaria || null,
+            Valor_curso: Valor_curso || 0.00,
             Status: Status || 'Ativo'
         });
 
@@ -125,6 +127,7 @@ router_cursos.put("/:id", async (req, res) => {
             Edicao,
             Duracao,
             Carga_Horaria,
+            Valor_curso,
             Status
         } = req.body;
 
@@ -145,6 +148,7 @@ router_cursos.put("/:id", async (req, res) => {
             Edicao: Edicao || curso.Edicao,
             Duracao: Duracao || curso.Duracao,
             Carga_Horaria: Carga_Horaria || curso.Carga_Horaria,
+            Valor_curso: Valor_curso !== undefined ? Valor_curso : curso.Valor_curso,
             Status: Status || curso.Status
         });
 
