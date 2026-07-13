@@ -51,12 +51,9 @@ const Cursos = sequelize.define("Cursos", {
         }
     },
     Valor_curso: {
-        type: Sequelize.DECIMAL(10, 2),
+        type: Sequelize.STRING(50),  // ALTERADO PARA STRING
         allowNull: false,
-        defaultValue: 0.00,
-        validate: {
-            min: 0
-        }
+        defaultValue: "0.00"
     },
     Status: {
         type: Sequelize.ENUM("Ativo", "Inativo", "Em desenvolvimento"),

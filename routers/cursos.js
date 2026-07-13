@@ -89,6 +89,11 @@ router_cursos.post("/", async (req, res) => {
             });
         }
 
+        // Converter Valor_curso para string, garantir que seja uma string
+        var valorCursoString = Valor_curso !== undefined && Valor_curso !== null 
+            ? String(Valor_curso) 
+            : "0.00";
+
         var newCurso = await Cursos.create({
             Nome: Nome.trim(),
             Desc: Desc || null,
@@ -97,7 +102,7 @@ router_cursos.post("/", async (req, res) => {
             Edicao: Edicao || '1º',
             Duracao: Duracao || null,
             Carga_Horaria: Carga_Horaria || null,
-            Valor_curso: Valor_curso || 0.00,
+            Valor_curso: valorCursoString,  // Agora é uma string
             Status: Status || 'Ativo'
         });
 
@@ -140,6 +145,11 @@ router_cursos.put("/:id", async (req, res) => {
             });
         }
 
+        // Converter Valor_curso para string se fornecido
+        var valorCursoString = Valor_curso !== undefined && Valor_curso !== null 
+            ? String(Valor_curso) 
+            : curso.Valor_curso;
+
         await curso.update({
             Nome: Nome ? Nome.trim() : curso.Nome,
             Desc: Desc !== undefined ? Desc : curso.Desc,
@@ -148,7 +158,7 @@ router_cursos.put("/:id", async (req, res) => {
             Edicao: Edicao || curso.Edicao,
             Duracao: Duracao || curso.Duracao,
             Carga_Horaria: Carga_Horaria || curso.Carga_Horaria,
-            Valor_curso: Valor_curso !== undefined ? Valor_curso : curso.Valor_curso,
+            Valor_curso: valorCursoString,  // Agora é uma string
             Status: Status || curso.Status
         });
 
