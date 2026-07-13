@@ -2,10 +2,31 @@ const express = require("express");
 const router_cursos = express.Router();
 const { Cursos } = require("../models/index.js");
 
-// ========== GET - Lista simplificada ==========
+function validarValorMonetario(valor) {
+    if (!valor) return true;
+    const valorLimpo = valor.toString()
+        .replace(/\s/g, '')
+        .replace(/R\$/g, '')
+        .replace(/\./g, '')
+        .replace(/,/g, '.');
+    const numero = parseFloat(valorLimpo);
+    return !isNaN(numero) && numero >= 0;
+}
+
+function formatarValorMonetario(valor) {
+    if (!valor) return "0.00";
+    const valorLimpo = valor.toString()
+        .replace(/\s/g, '')
+        .replace(/R\$/g, '')
+        .replace(/\./g, '')
+        .replace(/,/g, '.');
+    const numero = parseFloat(valorLimpo);
+    return numero.toFixed(2);
+}
+
 router_cursos.get("/lista", async (req, res) => {
     try {
-        var cursos = await Cursos.findAll({
+        const cursos = await Cursos.findAll({
             attributes: ['id', 'Nome', 'Valor_curso'],
             order: [['Nome', 'ASC']]
         });
@@ -25,7 +46,7 @@ router_cursos.get("/lista", async (req, res) => {
 
 router_cursos.get("/", async (req, res) => {
     try {
-        var cursos = await Cursos.findAll({
+        const cursos = await Cursos.findAll({
             order: [['Nome', 'ASC']]
         });
 
@@ -45,8 +66,8 @@ router_cursos.get("/", async (req, res) => {
 
 router_cursos.get("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var curso = await Cursos.findByPk(id);
+        const { id } = req.params;
+        const curso = await Cursos.findByPk(id);
 
         if (!curso) {
             return res.status(404).json({
@@ -70,7 +91,7 @@ router_cursos.get("/:id", async (req, res) => {
 
 router_cursos.post("/", async (req, res) => {
     try {
-        var { 
+        const { 
             Nome,
             Desc, 
             Tipo_curso, 
@@ -89,20 +110,54 @@ router_cursos.post("/", async (req, res) => {
             });
         }
 
-        // Converter Valor_curso para string, garantir que seja uma string
-        var valorCursoString = Valor_curso !== undefined && Valor_curso !== null 
-            ? String(Valor_curso) 
-            : "0.00";
+        if (Valor_curso && !validarValorMonetario(Valor_curso)) {
+            return res.status(400).json({
+                success: false,
+                message: "O Valor_curso deve ser um valor monetário válido"
+            });
+        }
 
-        var newCurso = await Cursos.create({
+        if (Modulos && (isNaN(parseInt(Modulos)) || parseInt(Modulos) < 1)) {
+            return res.status(400).json({
+                success: false,
+                message: "O campo Modulos deve ser um número maior ou igual a 1"
+            });
+        }
+
+        if (Carga_Horaria && (isNaN(parseInt(Carga_Horaria)) || parseInt(Carga_Horaria) < 0)) {
+            return res.status(400).json({
+                success: false,
+                message: "O campo Carga_Horaria deve ser um número maior ou igual a 0"
+            });
+        }
+
+        const edicoesValidas = ['1º', '2º', '3º', '4º', '5º', '6º', '7º', '8º', '9º', '10º'];
+        if (Edicao && !edicoesValidas.includes(Edicao)) {
+            return res.status(400).json({
+                success: false,
+                message: "Edição inválida. Use: " + edicoesValidas.join(', ')
+            });
+        }
+
+        const statusValidos = ['Ativo', 'Inativo', 'Em desenvolvimento'];
+        if (Status && !statusValidos.includes(Status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Status inválido. Use: " + statusValidos.join(', ')
+            });
+        }
+
+        const valorCursoFormatado = Valor_curso ? formatarValorMonetario(Valor_curso) : "0.00";
+
+        const newCurso = await Cursos.create({
             Nome: Nome.trim(),
             Desc: Desc || null,
             Tipo_curso: Tipo_curso || 'Formação profissional inicial',
-            Modulos: Modulos || 1,
+            Modulos: Modulos ? parseInt(Modulos) : 1,
             Edicao: Edicao || '1º',
             Duracao: Duracao || null,
-            Carga_Horaria: Carga_Horaria || null,
-            Valor_curso: valorCursoString,  // Agora é uma string
+            Carga_Horaria: Carga_Horaria ? parseInt(Carga_Horaria) : null,
+            Valor_curso: valorCursoFormatado,
             Status: Status || 'Ativo'
         });
 
@@ -123,8 +178,8 @@ router_cursos.post("/", async (req, res) => {
 
 router_cursos.put("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var { 
+        const { id } = req.params;
+        const { 
             Nome,
             Desc, 
             Tipo_curso, 
@@ -136,7 +191,7 @@ router_cursos.put("/:id", async (req, res) => {
             Status
         } = req.body;
 
-        var curso = await Cursos.findByPk(id);
+        const curso = await Cursos.findByPk(id);
 
         if (!curso) {
             return res.status(404).json({
@@ -145,20 +200,56 @@ router_cursos.put("/:id", async (req, res) => {
             });
         }
 
-        // Converter Valor_curso para string se fornecido
-        var valorCursoString = Valor_curso !== undefined && Valor_curso !== null 
-            ? String(Valor_curso) 
+        if (Valor_curso !== undefined && Valor_curso !== null && !validarValorMonetario(Valor_curso)) {
+            return res.status(400).json({
+                success: false,
+                message: "O Valor_curso deve ser um valor monetário válido"
+            });
+        }
+
+        if (Modulos !== undefined && (isNaN(parseInt(Modulos)) || parseInt(Modulos) < 1)) {
+            return res.status(400).json({
+                success: false,
+                message: "O campo Modulos deve ser um número maior ou igual a 1"
+            });
+        }
+
+        if (Carga_Horaria !== undefined && (isNaN(parseInt(Carga_Horaria)) || parseInt(Carga_Horaria) < 0)) {
+            return res.status(400).json({
+                success: false,
+                message: "O campo Carga_Horaria deve ser um número maior ou igual a 0"
+            });
+        }
+
+        const edicoesValidas = ['1º', '2º', '3º', '4º', '5º', '6º', '7º', '8º', '9º', '10º'];
+        if (Edicao !== undefined && !edicoesValidas.includes(Edicao)) {
+            return res.status(400).json({
+                success: false,
+                message: "Edição inválida. Use: " + edicoesValidas.join(', ')
+            });
+        }
+
+        const statusValidos = ['Ativo', 'Inativo', 'Em desenvolvimento'];
+        if (Status !== undefined && !statusValidos.includes(Status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Status inválido. Use: " + statusValidos.join(', ')
+            });
+        }
+
+        const valorCursoFormatado = Valor_curso !== undefined && Valor_curso !== null 
+            ? formatarValorMonetario(Valor_curso) 
             : curso.Valor_curso;
 
         await curso.update({
             Nome: Nome ? Nome.trim() : curso.Nome,
             Desc: Desc !== undefined ? Desc : curso.Desc,
             Tipo_curso: Tipo_curso || curso.Tipo_curso,
-            Modulos: Modulos || curso.Modulos,
+            Modulos: Modulos !== undefined ? parseInt(Modulos) : curso.Modulos,
             Edicao: Edicao || curso.Edicao,
-            Duracao: Duracao || curso.Duracao,
-            Carga_Horaria: Carga_Horaria || curso.Carga_Horaria,
-            Valor_curso: valorCursoString,  // Agora é uma string
+            Duracao: Duracao !== undefined ? Duracao : curso.Duracao,
+            Carga_Horaria: Carga_Horaria !== undefined ? parseInt(Carga_Horaria) : curso.Carga_Horaria,
+            Valor_curso: valorCursoFormatado,
             Status: Status || curso.Status
         });
 
@@ -179,8 +270,8 @@ router_cursos.put("/:id", async (req, res) => {
 
 router_cursos.delete("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var curso = await Cursos.findByPk(id);
+        const { id } = req.params;
+        const curso = await Cursos.findByPk(id);
 
         if (!curso) {
             return res.status(404).json({
@@ -207,8 +298,8 @@ router_cursos.delete("/:id", async (req, res) => {
 
 router_cursos.get("/tipo/:tipo", async (req, res) => {
     try {
-        var { tipo } = req.params;
-        var cursos = await Cursos.findAll({
+        const { tipo } = req.params;
+        const cursos = await Cursos.findAll({
             where: { Tipo_curso: tipo }
         });
 
@@ -229,8 +320,8 @@ router_cursos.get("/tipo/:tipo", async (req, res) => {
 
 router_cursos.get("/status/:status", async (req, res) => {
     try {
-        var { status } = req.params;
-        var cursos = await Cursos.findAll({
+        const { status } = req.params;
+        const cursos = await Cursos.findAll({
             where: { Status: status }
         });
 
@@ -251,8 +342,8 @@ router_cursos.get("/status/:status", async (req, res) => {
 
 router_cursos.patch("/:id/status", async (req, res) => {
     try {
-        var { id } = req.params;
-        var { Status } = req.body;
+        const { id } = req.params;
+        const { Status } = req.body;
 
         if (!Status) {
             return res.status(400).json({
@@ -261,7 +352,15 @@ router_cursos.patch("/:id/status", async (req, res) => {
             });
         }
 
-        var curso = await Cursos.findByPk(id);
+        const statusValidos = ['Ativo', 'Inativo', 'Em desenvolvimento'];
+        if (!statusValidos.includes(Status)) {
+            return res.status(400).json({
+                success: false,
+                message: "Status inválido. Use: " + statusValidos.join(', ')
+            });
+        }
+
+        const curso = await Cursos.findByPk(id);
 
         if (!curso) {
             return res.status(404).json({
