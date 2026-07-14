@@ -2,15 +2,9 @@ const express = require("express");
 const router_matriculas = express.Router();
 const { Matriculas } = require("../models/index.js");
 
-// ========== FUNÇÃO AUXILIAR: Normalizar nome ==========
-function normalizarNome(nome) {
-    if (!nome) return null;
-    return nome.trim().replace(/\s+/g, ' ');
-}
-
 router_matriculas.get("/", async (req, res) => {
     try {
-        const matriculas = await Matriculas.findAll({
+        var matriculas = await Matriculas.findAll({
             order: [['createdAt', 'DESC']]
         });
 
@@ -30,8 +24,8 @@ router_matriculas.get("/", async (req, res) => {
 
 router_matriculas.get("/:id", async (req, res) => {
     try {
-        const { id } = req.params;
-        const matricula = await Matriculas.findByPk(id);
+        var { id } = req.params;
+        var matricula = await Matriculas.findByPk(id);
 
         if (!matricula) {
             return res.status(404).json({
@@ -55,7 +49,7 @@ router_matriculas.get("/:id", async (req, res) => {
 
 router_matriculas.post("/", async (req, res) => {
     try {
-        let { 
+        var { 
             Nome, 
             Encarregado, 
             Morada, 
@@ -72,12 +66,6 @@ router_matriculas.post("/", async (req, res) => {
             Foto_Certificado
         } = req.body;
 
-        // Normalizar nomes
-        Nome = normalizarNome(Nome);
-        Encarregado = Encarregado ? normalizarNome(Encarregado) : null;
-        Curso = Curso ? normalizarNome(Curso) : null;
-        Turma = Turma ? normalizarNome(Turma) : null;
-
         if (!Nome || !Genero || !Telefone || !Curso || !Turma) {
             return res.status(400).json({
                 success: false,
@@ -85,18 +73,18 @@ router_matriculas.post("/", async (req, res) => {
             });
         }
 
-        const newMatricula = await Matriculas.create({
-            Nome,
-            Encarregado,
+        var newMatricula = await Matriculas.create({
+            Nome: Nome.trim(),
+            Encarregado: Encarregado ? Encarregado.trim() : null,
             Morada: Morada || null,
             BI_Cedula: BI_Cedula || null,
             Nascimento: Nascimento || null,
             Estado_Civil: Estado_Civil || 'Solteiro',
-            Genero,
+            Genero: Genero,
             Telefone: Telefone.trim(),
-            Curso,
+            Curso: Curso.trim(),
             Modulo: Modulo || 1,
-            Turma,
+            Turma: Turma.trim(),
             Status: Status || 'Inscrito',
             Foto_User: Foto_User || null,
             Foto_Certificado: Foto_Certificado || null
@@ -119,8 +107,8 @@ router_matriculas.post("/", async (req, res) => {
 
 router_matriculas.put("/:id", async (req, res) => {
     try {
-        const { id } = req.params;
-        let { 
+        var { id } = req.params;
+        var { 
             Nome, 
             Encarregado, 
             Morada, 
@@ -137,7 +125,7 @@ router_matriculas.put("/:id", async (req, res) => {
             Foto_Certificado
         } = req.body;
 
-        const matricula = await Matriculas.findByPk(id);
+        var matricula = await Matriculas.findByPk(id);
 
         if (!matricula) {
             return res.status(404).json({
@@ -146,24 +134,18 @@ router_matriculas.put("/:id", async (req, res) => {
             });
         }
 
-        // Normalizar nomes se fornecidos
-        Nome = Nome ? normalizarNome(Nome) : matricula.Nome;
-        Encarregado = Encarregado !== undefined ? (Encarregado ? normalizarNome(Encarregado) : null) : matricula.Encarregado;
-        Curso = Curso ? normalizarNome(Curso) : matricula.Curso;
-        Turma = Turma ? normalizarNome(Turma) : matricula.Turma;
-
         await matricula.update({
-            Nome,
-            Encarregado,
+            Nome: Nome ? Nome.trim() : matricula.Nome,
+            Encarregado: Encarregado ? Encarregado.trim() : matricula.Encarregado,
             Morada: Morada || matricula.Morada,
             BI_Cedula: BI_Cedula || matricula.BI_Cedula,
             Nascimento: Nascimento || matricula.Nascimento,
             Estado_Civil: Estado_Civil || matricula.Estado_Civil,
             Genero: Genero || matricula.Genero,
             Telefone: Telefone ? Telefone.trim() : matricula.Telefone,
-            Curso,
+            Curso: Curso ? Curso.trim() : matricula.Curso,
             Modulo: Modulo || matricula.Modulo,
-            Turma,
+            Turma: Turma ? Turma.trim() : matricula.Turma,
             Status: Status || matricula.Status,
             Foto_User: Foto_User || matricula.Foto_User,
             Foto_Certificado: Foto_Certificado || matricula.Foto_Certificado
@@ -186,8 +168,8 @@ router_matriculas.put("/:id", async (req, res) => {
 
 router_matriculas.delete("/:id", async (req, res) => {
     try {
-        const { id } = req.params;
-        const matricula = await Matriculas.findByPk(id);
+        var { id } = req.params;
+        var matricula = await Matriculas.findByPk(id);
 
         if (!matricula) {
             return res.status(404).json({
@@ -214,8 +196,8 @@ router_matriculas.delete("/:id", async (req, res) => {
 
 router_matriculas.get("/curso/:curso", async (req, res) => {
     try {
-        const { curso } = req.params;
-        const matriculas = await Matriculas.findAll({
+        var { curso } = req.params;
+        var matriculas = await Matriculas.findAll({
             where: { Curso: curso }
         });
 
@@ -236,8 +218,8 @@ router_matriculas.get("/curso/:curso", async (req, res) => {
 
 router_matriculas.get("/turma/:turma", async (req, res) => {
     try {
-        const { turma } = req.params;
-        const matriculas = await Matriculas.findAll({
+        var { turma } = req.params;
+        var matriculas = await Matriculas.findAll({
             where: { Turma: turma }
         });
 
@@ -258,8 +240,8 @@ router_matriculas.get("/turma/:turma", async (req, res) => {
 
 router_matriculas.get("/status/:status", async (req, res) => {
     try {
-        const { status } = req.params;
-        const matriculas = await Matriculas.findAll({
+        var { status } = req.params;
+        var matriculas = await Matriculas.findAll({
             where: { Status: status }
         });
 
@@ -280,8 +262,8 @@ router_matriculas.get("/status/:status", async (req, res) => {
 
 router_matriculas.patch("/:id/status", async (req, res) => {
     try {
-        const { id } = req.params;
-        const { Status } = req.body;
+        var { id } = req.params;
+        var { Status } = req.body;
 
         if (!Status) {
             return res.status(400).json({
@@ -290,7 +272,7 @@ router_matriculas.patch("/:id/status", async (req, res) => {
             });
         }
 
-        const matricula = await Matriculas.findByPk(id);
+        var matricula = await Matriculas.findByPk(id);
 
         if (!matricula) {
             return res.status(404).json({
