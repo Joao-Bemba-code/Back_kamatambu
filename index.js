@@ -9,6 +9,7 @@ var formadoresRoutes = require("./routers/formadores.js");
 var matriculasRoutes = require("./routers/matriculas.js");
 var turmasRoutes = require("./routers/turmas.js");
 var cursosRoutes = require("./routers/cursos.js");
+var pagamentosRoutes = require("./routers/pagamentos.js");
 const statsRoutes = require("./routers/stats.js");
 
 var app = express();
@@ -19,7 +20,7 @@ app.use(cors());
 
 // LOG - Mostrar todas as requisições
 app.use((req, res, next) => {
-    console.log(`📨 ${req.method} ${req.url}`);
+    console.log(` ${req.method} ${req.url}`);
     next();
 });
 
@@ -29,6 +30,7 @@ app.use("/api/formadores", formadoresRoutes);
 app.use("/api/matriculas", matriculasRoutes);
 app.use("/api/turmas", turmasRoutes);
 app.use("/api/cursos", cursosRoutes);
+app.use("/api/pagamentos", pagamentosRoutes);
 app.use("/api/stats", statsRoutes);
 
 // rota de test
@@ -43,7 +45,16 @@ app.get("/test", (req, res) => {
 app.get("/", (req, res) => {
     res.status(200).json({
         msg: "API está rodando!",
-        rotas: ["/test", "/auth", "/api/formadores", "/api/matriculas", "/api/turmas", "/api/cursos", "/api/stats"],
+        rotas: [
+            "/test", 
+            "/auth", 
+            "/api/formadores", 
+            "/api/matriculas", 
+            "/api/turmas", 
+            "/api/cursos", 
+            "/api/pagamentos",
+            "/api/stats"
+        ],
         port: port
     });
 });

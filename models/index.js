@@ -3,11 +3,13 @@ const Formadores = require("./Formadores.js");
 const Matriculas = require("./Matriculas.js");
 const Turmas = require("./Turmas.js");
 const Cursos = require("./Cursos.js");
+const Pagamentos = require("./Pagamentos.js"); // NOVO MODELO
 
 module.exports = {
     Users,
     Formadores,
     Matriculas,
     Turmas,
-    Cursos
+    Cursos,
+    Pagamentos // NOVO
 };
