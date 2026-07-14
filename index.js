@@ -11,6 +11,7 @@ var turmasRoutes = require("./routers/turmas.js");
 var cursosRoutes = require("./routers/cursos.js");
 var pagamentosRoutes = require("./routers/pagamentos.js");
 const statsRoutes = require("./routers/stats.js");
+var academicoRoutes = require("./routers/academico.js");
 
 var app = express();
 var port = process.env.port || 8080;
@@ -32,6 +33,8 @@ app.use("/api/turmas", turmasRoutes);
 app.use("/api/cursos", cursosRoutes);
 app.use("/api/pagamentos", pagamentosRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/academico", academicoRoutes);
+
 
 // rota de test
 app.get("/test", (req, res) => {
