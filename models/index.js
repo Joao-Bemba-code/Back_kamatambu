@@ -6,6 +6,7 @@ const Cursos = require("./Cursos.js");
 const Notas = require("./Notas.js");
 const Frequencia = require("./Frequencia.js");
 const Boletim = require("./Boletim.js");
+const Pagamento = require("./Pagamentos.js");
 
 module.exports = {
     Users,
