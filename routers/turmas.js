@@ -1,11 +1,18 @@
 const express = require("express");
 const router_turmas = express.Router();
-const { Turmas, Matriculas } = require("../models/index.js");
+const { Turmas, Matriculas, Formadores } = require("../models/index.js");
+const { Sequelize } = require("sequelize");
+
+// ========== FUNÇÃO AUXILIAR: Normalizar nome ==========
+function normalizarNome(nome) {
+    if (!nome) return null;
+    return nome.trim().replace(/\s+/g, ' ');
+}
 
 // ========== GET - Listar todas as turmas ==========
 router_turmas.get("/", async (req, res) => {
     try {
-        var turmas = await Turmas.findAll({
+        const turmas = await Turmas.findAll({
             order: [['createdAt', 'DESC']]
         });
 
@@ -37,8 +44,8 @@ router_turmas.get("/", async (req, res) => {
 // ========== GET - Buscar turma por ID ==========
 router_turmas.get("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var turma = await Turmas.findByPk(id);
+        const { id } = req.params;
+        const turma = await Turmas.findByPk(id);
 
         if (!turma) {
             return res.status(404).json({
@@ -71,7 +78,7 @@ router_turmas.get("/:id", async (req, res) => {
 // ========== POST - Criar nova turma ==========
 router_turmas.post("/", async (req, res) => {
     try {
-        var { 
+        let { 
             Turma, 
             Curso, 
             Modulo, 
@@ -91,17 +98,42 @@ router_turmas.post("/", async (req, res) => {
             });
         }
 
-        var newTurma = await Turmas.create({
-            Turma: Turma.trim(),
-            Curso: Curso.trim(),
+        // Normalizar nomes
+        Turma = normalizarNome(Turma);
+        Curso = normalizarNome(Curso);
+        Formador = Formador ? normalizarNome(Formador) : null;
+
+        // Se Formador for string vazia, converter para null
+        if (Formador === '') {
+            Formador = null;
+        }
+
+        // Validar se o formador existe no banco (se foi fornecido)
+        if (Formador) {
+            const formadorExists = await Formadores.findOne({
+                where: { 
+                    Nome: {
+                        [Sequelize.Op.iLike]: Formador
+                    }
+                }
+            });
+            if (!formadorExists) {
+                console.warn(`Formador "${Formador}" não encontrado no banco de dados. A turma será criada sem formador.`);
+                Formador = null;
+            }
+        }
+
+        const newTurma = await Turmas.create({
+            Turma,
+            Curso,
             Modulo: Modulo || 1,
             Periodo: Periodo || 'Manhã',
             Numero_Alunos: 0,
             Capacidade_Maxima: Capacidade_Maxima || 30,
-            Data_INIC: Data_INIC,
-            Data_Term: Data_Term,
+            Data_INIC,
+            Data_Term,
             Status: Status || 'Pendente',
-            Formador: Formador || null,
+            Formador,
             Sala: Sala || null
         });
 
@@ -123,8 +155,8 @@ router_turmas.post("/", async (req, res) => {
 // ========== PUT - Atualizar turma ==========
 router_turmas.put("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var { 
+        const { id } = req.params;
+        let { 
             Turma, 
             Curso, 
             Modulo, 
@@ -137,7 +169,7 @@ router_turmas.put("/:id", async (req, res) => {
             Sala
         } = req.body;
 
-        var turma = await Turmas.findByPk(id);
+        const turma = await Turmas.findByPk(id);
 
         if (!turma) {
             return res.status(404).json({
@@ -146,16 +178,38 @@ router_turmas.put("/:id", async (req, res) => {
             });
         }
 
+        // Normalizar nomes
+        Turma = Turma ? normalizarNome(Turma) : turma.Turma;
+        Curso = Curso ? normalizarNome(Curso) : turma.Curso;
+        Formador = Formador !== undefined && Formador !== null 
+            ? (Formador === '' ? null : normalizarNome(Formador))
+            : turma.Formador;
+
+        // Validar se o formador existe no banco (se foi fornecido)
+        if (Formador) {
+            const formadorExists = await Formadores.findOne({
+                where: { 
+                    Nome: {
+                        [Sequelize.Op.iLike]: Formador
+                    }
+                }
+            });
+            if (!formadorExists) {
+                console.warn(`Formador "${Formador}" não encontrado no banco de dados. A turma será atualizada sem formador.`);
+                Formador = null;
+            }
+        }
+
         const count = await Matriculas.count({
             where: { 
-                Turma: Turma || turma.Turma,
+                Turma: Turma,
                 Status: ['Inscrito', 'Admitido', 'Ativo']
             }
         });
 
         await turma.update({
-            Turma: Turma ? Turma.trim() : turma.Turma,
-            Curso: Curso ? Curso.trim() : turma.Curso,
+            Turma,
+            Curso,
             Modulo: Modulo || turma.Modulo,
             Periodo: Periodo || turma.Periodo,
             Numero_Alunos: count,
@@ -163,7 +217,7 @@ router_turmas.put("/:id", async (req, res) => {
             Data_INIC: Data_INIC || turma.Data_INIC,
             Data_Term: Data_Term || turma.Data_Term,
             Status: Status || turma.Status,
-            Formador: Formador || turma.Formador,
+            Formador,
             Sala: Sala || turma.Sala
         });
 
@@ -185,8 +239,8 @@ router_turmas.put("/:id", async (req, res) => {
 // ========== DELETE - Deletar turma ==========
 router_turmas.delete("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var turma = await Turmas.findByPk(id);
+        const { id } = req.params;
+        const turma = await Turmas.findByPk(id);
 
         if (!turma) {
             return res.status(404).json({
@@ -214,8 +268,8 @@ router_turmas.delete("/:id", async (req, res) => {
 // ========== GET - Buscar turmas por curso ==========
 router_turmas.get("/curso/:curso", async (req, res) => {
     try {
-        var { curso } = req.params;
-        var turmas = await Turmas.findAll({
+        const { curso } = req.params;
+        const turmas = await Turmas.findAll({
             where: { Curso: curso }
         });
 
@@ -248,8 +302,8 @@ router_turmas.get("/curso/:curso", async (req, res) => {
 // ========== GET - Buscar turmas por formador ==========
 router_turmas.get("/formador/:formador", async (req, res) => {
     try {
-        var { formador } = req.params;
-        var turmas = await Turmas.findAll({
+        const { formador } = req.params;
+        const turmas = await Turmas.findAll({
             where: { Formador: formador }
         });
 
@@ -282,8 +336,8 @@ router_turmas.get("/formador/:formador", async (req, res) => {
 // ========== GET - Buscar turmas por status ==========
 router_turmas.get("/status/:status", async (req, res) => {
     try {
-        var { status } = req.params;
-        var turmas = await Turmas.findAll({
+        const { status } = req.params;
+        const turmas = await Turmas.findAll({
             where: { Status: status }
         });
 
@@ -305,8 +359,8 @@ router_turmas.get("/status/:status", async (req, res) => {
 // ========== GET - Buscar turmas por período ==========
 router_turmas.get("/periodo/:periodo", async (req, res) => {
     try {
-        var { periodo } = req.params;
-        var turmas = await Turmas.findAll({
+        const { periodo } = req.params;
+        const turmas = await Turmas.findAll({
             where: { Periodo: periodo }
         });
 
@@ -328,8 +382,8 @@ router_turmas.get("/periodo/:periodo", async (req, res) => {
 // ========== PATCH - Atualizar status ==========
 router_turmas.patch("/:id/status", async (req, res) => {
     try {
-        var { id } = req.params;
-        var { Status } = req.body;
+        const { id } = req.params;
+        const { Status } = req.body;
 
         if (!Status) {
             return res.status(400).json({
@@ -338,7 +392,7 @@ router_turmas.patch("/:id/status", async (req, res) => {
             });
         }
 
-        var turma = await Turmas.findByPk(id);
+        const turma = await Turmas.findByPk(id);
 
         if (!turma) {
             return res.status(404).json({

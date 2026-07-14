@@ -2,6 +2,7 @@ const express = require("express");
 const router_cursos = express.Router();
 const { Cursos } = require("../models/index.js");
 
+// ========== FUNÇÕES AUXILIARES ==========
 function validarValorMonetario(valor) {
     if (!valor) return true;
     const valorLimpo = valor.toString()

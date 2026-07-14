@@ -1,11 +1,18 @@
 const express = require("express");
 const router_formadores = express.Router();
 const { Formadores, Turmas } = require("../models/index.js");
+const { Sequelize } = require("sequelize");
+
+// ========== FUNÇÃO AUXILIAR: Normalizar nome ==========
+function normalizarNome(nome) {
+    if (!nome) return null;
+    return nome.trim().replace(/\s+/g, ' ');
+}
 
 // ========== LISTA SIMPLIFICADA ==========
 router_formadores.get("/lista", async (req, res) => {
     try {
-        var formadores = await Formadores.findAll({
+        const formadores = await Formadores.findAll({
             attributes: ['id', 'Nome', 'Especialidade'],
             where: { Status: 'Ativo' },
             order: [['Nome', 'ASC']]
@@ -27,7 +34,7 @@ router_formadores.get("/lista", async (req, res) => {
 // ========== GET - Listar todos ==========
 router_formadores.get("/", async (req, res) => {
     try {
-        var formadores = await Formadores.findAll({
+        const formadores = await Formadores.findAll({
             order: [['Nome', 'ASC']]
         });
 
@@ -56,8 +63,8 @@ router_formadores.get("/", async (req, res) => {
 // ========== GET - Buscar por ID ==========
 router_formadores.get("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var formador = await Formadores.findByPk(id);
+        const { id } = req.params;
+        const formador = await Formadores.findByPk(id);
 
         if (!formador) {
             return res.status(404).json({
@@ -87,7 +94,7 @@ router_formadores.get("/:id", async (req, res) => {
 // ========== POST - Criar ==========
 router_formadores.post("/", async (req, res) => {
     try {
-        var { 
+        let { 
             Nome, 
             Email, 
             Telefone, 
@@ -103,6 +110,9 @@ router_formadores.post("/", async (req, res) => {
             Data_Contratacao
         } = req.body;
 
+        // Normalizar nome
+        Nome = normalizarNome(Nome);
+
         if (!Nome || !Email || !Telefone || !Especialidade || !Curso || !Genero) {
             return res.status(400).json({
                 success: false,
@@ -110,7 +120,7 @@ router_formadores.post("/", async (req, res) => {
             });
         }
 
-        var emailExists = await Formadores.findOne({ where: { Email: Email.trim() } });
+        const emailExists = await Formadores.findOne({ where: { Email: Email.trim().toLowerCase() } });
         if (emailExists) {
             return res.status(409).json({
                 success: false,
@@ -119,7 +129,7 @@ router_formadores.post("/", async (req, res) => {
         }
 
         if (BI) {
-            var biExists = await Formadores.findOne({ where: { BI: BI.trim() } });
+            const biExists = await Formadores.findOne({ where: { BI: BI.trim() } });
             if (biExists) {
                 return res.status(409).json({
                     success: false,
@@ -128,15 +138,15 @@ router_formadores.post("/", async (req, res) => {
             }
         }
 
-        var newFormador = await Formadores.create({
-            Nome: Nome.trim(),
+        const newFormador = await Formadores.create({
+            Nome,
             Email: Email.trim().toLowerCase(),
             Telefone: Telefone.trim(),
             Especialidade: Especialidade.trim(),
             Curso: Curso.trim(),
             Turmas: 0,
             Status: Status || 'Ativo',
-            Genero: Genero,
+            Genero,
             Data_Nascimento: Data_Nascimento || null,
             BI: BI ? BI.trim() : null,
             Morada: Morada || null,
@@ -163,8 +173,8 @@ router_formadores.post("/", async (req, res) => {
 // ========== PUT - Atualizar ==========
 router_formadores.put("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var { 
+        const { id } = req.params;
+        let { 
             Nome, 
             Email, 
             Telefone, 
@@ -180,7 +190,7 @@ router_formadores.put("/:id", async (req, res) => {
             Data_Contratacao
         } = req.body;
 
-        var formador = await Formadores.findByPk(id);
+        const formador = await Formadores.findByPk(id);
 
         if (!formador) {
             return res.status(404).json({
@@ -189,9 +199,14 @@ router_formadores.put("/:id", async (req, res) => {
             });
         }
 
+        // Normalizar nome se fornecido
+        if (Nome) {
+            Nome = normalizarNome(Nome);
+        }
+
         if (Email && Email !== formador.Email) {
-            var emailExists = await Formadores.findOne({ 
-                where: { Email: Email.trim() } 
+            const emailExists = await Formadores.findOne({ 
+                where: { Email: Email.trim().toLowerCase() } 
             });
             if (emailExists) {
                 return res.status(409).json({
@@ -202,7 +217,7 @@ router_formadores.put("/:id", async (req, res) => {
         }
 
         if (BI && BI !== formador.BI) {
-            var biExists = await Formadores.findOne({ 
+            const biExists = await Formadores.findOne({ 
                 where: { BI: BI.trim() } 
             });
             if (biExists) {
@@ -218,7 +233,7 @@ router_formadores.put("/:id", async (req, res) => {
         });
 
         await formador.update({
-            Nome: Nome ? Nome.trim() : formador.Nome,
+            Nome: Nome || formador.Nome,
             Email: Email ? Email.trim().toLowerCase() : formador.Email,
             Telefone: Telefone ? Telefone.trim() : formador.Telefone,
             Especialidade: Especialidade ? Especialidade.trim() : formador.Especialidade,
@@ -252,8 +267,8 @@ router_formadores.put("/:id", async (req, res) => {
 // ========== DELETE ==========
 router_formadores.delete("/:id", async (req, res) => {
     try {
-        var { id } = req.params;
-        var formador = await Formadores.findByPk(id);
+        const { id } = req.params;
+        const formador = await Formadores.findByPk(id);
 
         if (!formador) {
             return res.status(404).json({
@@ -281,8 +296,8 @@ router_formadores.delete("/:id", async (req, res) => {
 // ========== GET - Buscar turmas do formador ==========
 router_formadores.get("/:id/turmas", async (req, res) => {
     try {
-        var { id } = req.params;
-        var formador = await Formadores.findByPk(id);
+        const { id } = req.params;
+        const formador = await Formadores.findByPk(id);
 
         if (!formador) {
             return res.status(404).json({
@@ -291,7 +306,7 @@ router_formadores.get("/:id/turmas", async (req, res) => {
             });
         }
 
-        var turmas = await Turmas.findAll({
+        const turmas = await Turmas.findAll({
             where: { Formador: formador.Nome }
         });
 
@@ -310,10 +325,11 @@ router_formadores.get("/:id/turmas", async (req, res) => {
     }
 });
 
+// ========== GET - Buscar formadores por curso ==========
 router_formadores.get("/curso/:curso", async (req, res) => {
     try {
-        var { curso } = req.params;
-        var formadores = await Formadores.findAll({
+        const { curso } = req.params;
+        const formadores = await Formadores.findAll({
             where: { Curso: curso },
             order: [['Nome', 'ASC']]
         });
@@ -341,9 +357,10 @@ router_formadores.get("/curso/:curso", async (req, res) => {
     }
 });
 
+// ========== GET - Buscar formadores ativos ==========
 router_formadores.get("/status/ativo", async (req, res) => {
     try {
-        var formadores = await Formadores.findAll({
+        const formadores = await Formadores.findAll({
             where: { Status: 'Ativo' },
             order: [['Nome', 'ASC']]
         });
@@ -371,10 +388,11 @@ router_formadores.get("/status/ativo", async (req, res) => {
     }
 });
 
+// ========== PATCH - Atualizar status ==========
 router_formadores.patch("/:id/status", async (req, res) => {
     try {
-        var { id } = req.params;
-        var { Status } = req.body;
+        const { id } = req.params;
+        const { Status } = req.body;
 
         if (!Status) {
             return res.status(400).json({
@@ -383,7 +401,7 @@ router_formadores.patch("/:id/status", async (req, res) => {
             });
         }
 
-        var formador = await Formadores.findByPk(id);
+        const formador = await Formadores.findByPk(id);
 
         if (!formador) {
             return res.status(404).json({
