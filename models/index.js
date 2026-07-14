@@ -3,10 +3,10 @@ const Formadores = require("./Formadores.js");
 const Matriculas = require("./Matriculas.js");
 const Turmas = require("./Turmas.js");
 const Cursos = require("./Cursos.js");
+const Pagamentos = require("./Pagamentos.js");
 const Notas = require("./Notas.js");
 const Frequencia = require("./Frequencia.js");
 const Boletim = require("./Boletim.js");
-const Pagamento = require("./Pagamentos.js");
 
 module.exports = {
     Users,
