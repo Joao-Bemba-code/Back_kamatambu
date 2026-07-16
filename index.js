@@ -12,6 +12,7 @@ var cursosRoutes = require("./routers/cursos.js");
 var pagamentosRoutes = require("./routers/pagamentos.js");
 const statsRoutes = require("./routers/stats.js");
 var academicoRoutes = require("./routers/academico.js");
+var criteriosRoutes = require("./routers/criteriosAvaliacao.js");
 
 var app = express();
 var port = process.env.port || 8080;
@@ -34,6 +35,7 @@ app.use("/api/cursos", cursosRoutes);
 app.use("/api/pagamentos", pagamentosRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/academico", academicoRoutes);
+app.use("/api/criterios-avaliacao", criteriosRoutes);
 
 
 // rota de test
@@ -56,7 +58,8 @@ app.get("/", (req, res) => {
             "/api/turmas", 
             "/api/cursos", 
             "/api/pagamentos",
-            "/api/stats"
+            "/api/stats",
+            "/api/criterios-avaliacao"
         ],
         port: port
     });

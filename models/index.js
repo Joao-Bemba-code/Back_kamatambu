@@ -7,6 +7,7 @@ const Pagamentos = require("./Pagamentos.js");
 const Notas = require("./Notas.js");
 const Frequencia = require("./Frequencia.js");
 const Boletim = require("./Boletim.js");
+const CriteriosAvaliacao = require("./CriteriosAvaliacao.js");
 
 module.exports = {
     Users,
@@ -17,5 +18,6 @@ module.exports = {
     Pagamentos,
     Notas,
     Frequencia,
-    Boletim
+    Boletim,
+    CriteriosAvaliacao
 };
