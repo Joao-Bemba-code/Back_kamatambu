@@ -1,37 +1,51 @@
 var jwt = require("jsonwebtoken");
 
-module.exports={
-    eAdmin: async(req,res,next)=>{
+var JWT_SECRET = process.env.SECRET || "default_secret_key";
 
-     let token = req.headers["authorization"];
+module.exports = {
+    authenticate: async (req, res, next) => {
+        var authHeader = req.headers["authorization"];
 
-     if(!token){
-        return res.status(401).json({
-            msg: " no token "
-        });
-     }
+        if (!authHeader) {
+            return res.status(401).json({
+                success: false,
+                message: "Token não fornecido"
+            });
+        }
 
-     token = req.headers["authorization"].replace("Bearer ", "");
+        var token = authHeader.replace("Bearer ", "");
 
-     if (blacklist[token]){
-        return res.status(403).json({ message: "Invalid token." });
-     } 
+        try {
+            var decoded = jwt.verify(token, JWT_SECRET);
 
-    try {
-       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            if (!decoded || !decoded.id) {
+                return res.status(401).json({ success: false, message: "Token inválido" });
+            }
 
-       if (!decoded) return res.status(403).json({ message: "Invalid token." });
- 
-       res.locals.token = decoded;
-       
-       return next();
+            req.user = {
+                id: decoded.id,
+                email: decoded.email,
+                nome: decoded.nome,
+                eAdmin: decoded.eAdmin || false
+            };
 
-   } catch (err) {
+            return next();
 
-       return res.status(403).json({ message: err.message });
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                return res.status(401).json({ success: false, message: "Token expirado" });
+            }
+            return res.status(401).json({ success: false, message: "Token inválido" });
+        }
+    },
 
-   }
- 
-
-   }
-}
+    requireAdmin: async (req, res, next) => {
+        if (!req.user || !req.user.eAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: "Acesso restrito a administradores"
+            });
+        }
+        return next();
+    }
+};

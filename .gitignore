@@ -1,2 +1,5 @@
+createCriteriosTable.js
+seedCriterios.js
+clearAvaliacoes.js
+node_modules/
 .env
-node_modules

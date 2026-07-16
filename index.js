@@ -3,6 +3,7 @@ var dotenv = require('dotenv');
 dotenv.config();
 
 var cors = require("cors");
+var { authenticate, requireAdmin } = require("./protect/index.js");
 
 var router_auth = require("./routers/users.js");
 var formadoresRoutes = require("./routers/formadores.js");
@@ -20,58 +21,42 @@ var port = process.env.port || 8080;
 app.use(express.json());
 app.use(cors());
 
-// LOG - Mostrar todas as requisições
+// LOG
 app.use((req, res, next) => {
     console.log(` ${req.method} ${req.url}`);
     next();
 });
 
-// routers 
+// Rotas publicas (auth)
 app.use("/auth", router_auth);
-app.use("/api/formadores", formadoresRoutes);
-app.use("/api/matriculas", matriculasRoutes);
-app.use("/api/turmas", turmasRoutes);
-app.use("/api/cursos", cursosRoutes);
-app.use("/api/pagamentos", pagamentosRoutes);
-app.use("/api/stats", statsRoutes);
-app.use("/api/academico", academicoRoutes);
-app.use("/api/criterios-avaliacao", criteriosRoutes);
 
+// Rotas protegidas (token obrigatorio)
+app.use("/api/formadores", authenticate, formadoresRoutes);
+app.use("/api/matriculas", authenticate, matriculasRoutes);
+app.use("/api/turmas", authenticate, turmasRoutes);
+app.use("/api/cursos", authenticate, cursosRoutes);
+app.use("/api/pagamentos", authenticate, pagamentosRoutes);
+app.use("/api/stats", authenticate, statsRoutes);
+app.use("/api/academico", authenticate, academicoRoutes);
+app.use("/api/criterios-avaliacao", authenticate, criteriosRoutes);
 
-// rota de test
+// Rotas publicas
 app.get("/test", (req, res) => {
     console.log("Rota /test chamada!");
-    res.status(200).json({
-        msg: "teste"
-    });
+    res.status(200).json({ msg: "teste" });
 });
 
-// Rota raiz
 app.get("/", (req, res) => {
     res.status(200).json({
         msg: "API está rodando!",
-        rotas: [
-            "/test", 
-            "/auth", 
-            "/api/formadores", 
-            "/api/matriculas", 
-            "/api/turmas", 
-            "/api/cursos", 
-            "/api/pagamentos",
-            "/api/stats",
-            "/api/criterios-avaliacao"
-        ],
         port: port
     });
 });
 
-// Tratamento de rotas não encontradas (404)
+// 404
 app.use((req, res) => {
     console.log(`Rota não encontrada: ${req.method} ${req.url}`);
-    res.status(404).json({
-        error: "Rota não encontrada",
-        url: req.url
-    });
+    res.status(404).json({ error: "Rota não encontrada" });
 });
 
 app.listen(port, (e) => {
@@ -79,6 +64,4 @@ app.listen(port, (e) => {
         console.log('houve um erro ao executar server:', e);
     }
     console.log(`Server on na porta ${port}!`);
-    console.log(`Teste: http://localhost:${port}/test`);
-    console.log(`Rotas: http://localhost:${port}/`);
 });
