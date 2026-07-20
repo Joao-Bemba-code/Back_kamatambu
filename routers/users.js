@@ -61,7 +61,8 @@ router_auth.post("/register", async (req, res) => {
                 id: newUser.id, 
                 email: newUser.Email, 
                 nome: newUser.Nome, 
-                eAdmin: newUser.eAdmin || false 
+                eAdmin: newUser.eAdmin || false,
+                tipo: newUser.tipo || 'admin'
             },
             process.env.SECRET || "default_secret_key",
             { expiresIn: '24h' }
@@ -75,7 +76,8 @@ router_auth.post("/register", async (req, res) => {
                 id: newUser.id,
                 nome: newUser.Nome,
                 email: newUser.Email,
-                eAdmin: newUser.eAdmin || false 
+                eAdmin: newUser.eAdmin || false,
+                tipo: newUser.tipo || 'admin'
             }
         });
 
@@ -124,7 +126,8 @@ router_auth.post("/login", async (req, res) => {
                 id: user.id, 
                 email: user.Email, 
                 nome: user.Nome, 
-                eAdmin: user.eAdmin || false 
+                eAdmin: user.eAdmin || false,
+                tipo: user.tipo || 'admin'
             },
             process.env.SECRET || "default_secret_key",
             { expiresIn: '24h' }
@@ -138,7 +141,8 @@ router_auth.post("/login", async (req, res) => {
                 id: user.id,
                 nome: user.Nome,
                 email: user.Email,
-                eAdmin: user.eAdmin || false
+                eAdmin: user.eAdmin || false,
+                tipo: user.tipo || 'admin'
             }
         });
 
@@ -308,6 +312,63 @@ router_auth.post("/logout", async (req, res) => {
         success: true,
         message: "Logout realizado com sucesso"
     });
+});
+
+router_auth.get("/users", async (req, res) => {
+    try {
+        var users = await Users.findAll({
+            attributes: { exclude: ['Senha'] },
+            order: [['id', 'ASC']]
+        });
+        return res.status(200).json({ success: true, data: users });
+    } catch (error) {
+        console.error("Erro ao listar users:", error);
+        return res.status(500).json({ success: false, message: "Erro interno do servidor" });
+    }
+});
+
+router_auth.put("/users/:id", async (req, res) => {
+    try {
+        var { id } = req.params;
+        var { tipo, eAdmin } = req.body;
+        var user = await Users.findByPk(id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Utilizador não encontrado" });
+        }
+        var updates = {};
+        if (tipo !== undefined) updates.tipo = tipo;
+        if (eAdmin !== undefined) updates.eAdmin = eAdmin;
+        await user.update(updates);
+        return res.status(200).json({
+            success: true,
+            message: "Utilizador atualizado com sucesso",
+            user: { id: user.id, nome: user.Nome, email: user.Email, eAdmin: user.eAdmin, tipo: user.tipo }
+        });
+    } catch (error) {
+        console.error("Erro ao atualizar user:", error);
+        return res.status(500).json({ success: false, message: "Erro interno do servidor" });
+    }
+});
+
+router_auth.put("/users/:id/senha", async (req, res) => {
+    try {
+        var { id } = req.params;
+        var { NovaSenha } = req.body;
+        if (!NovaSenha || NovaSenha.length < 6) {
+            return res.status(400).json({ success: false, message: "A senha deve ter pelo menos 6 caracteres" });
+        }
+        var user = await Users.findByPk(id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Utilizador não encontrado" });
+        }
+        var salt = await bcrypt.genSalt(10);
+        var hashedPassword = await bcrypt.hash(NovaSenha, salt);
+        await user.update({ Senha: hashedPassword });
+        return res.status(200).json({ success: true, message: "Senha alterada com sucesso" });
+    } catch (error) {
+        console.error("Erro ao alterar senha:", error);
+        return res.status(500).json({ success: false, message: "Erro interno do servidor" });
+    }
 });
 
 module.exports = router_auth;

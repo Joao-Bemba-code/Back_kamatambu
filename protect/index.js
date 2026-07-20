@@ -26,7 +26,8 @@ module.exports = {
                 id: decoded.id,
                 email: decoded.email,
                 nome: decoded.nome,
-                eAdmin: decoded.eAdmin || false
+                eAdmin: decoded.eAdmin || false,
+                tipo: decoded.tipo || 'admin'
             };
 
             return next();
