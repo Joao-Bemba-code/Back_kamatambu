@@ -14,7 +14,7 @@ var Users = sequelize.define("Users",{
         type:Sequelize.BOOLEAN
     },
     tipo:{
-        type:Sequelize.ENUM('admin', 'pedagogico', 'tesouraria', 'pendente'),
+        type:Sequelize.ENUM('admin', 'pedagogico', 'tesouraria', 'recursos_humanos', 'pendente'),
         defaultValue: 'pendente'
     }
 })
