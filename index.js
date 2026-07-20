@@ -3,6 +3,7 @@ var dotenv = require('dotenv');
 dotenv.config();
 
 var cors = require("cors");
+var path = require("path");
 var { authenticate, requireAdmin } = require("./protect/index.js");
 
 var router_auth = require("./routers/users.js");
@@ -14,12 +15,16 @@ var pagamentosRoutes = require("./routers/pagamentos.js");
 const statsRoutes = require("./routers/stats.js");
 var academicoRoutes = require("./routers/academico.js");
 var criteriosRoutes = require("./routers/criteriosAvaliacao.js");
+var uploadRouter = require("./routers/upload.js");
 
 var app = express();
 var port = process.env.port || 8080;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(cors());
+
+// Servir ficheiros de upload estaticamente
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // LOG
 app.use((req, res, next) => {
@@ -39,6 +44,7 @@ app.use("/api/pagamentos", authenticate, pagamentosRoutes);
 app.use("/api/stats", authenticate, statsRoutes);
 app.use("/api/academico", authenticate, academicoRoutes);
 app.use("/api/criterios-avaliacao", authenticate, criteriosRoutes);
+app.use("/api/upload", authenticate, uploadRouter);
 
 // Rotas publicas
 app.get("/test", (req, res) => {
