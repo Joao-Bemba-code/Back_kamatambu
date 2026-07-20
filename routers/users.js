@@ -53,7 +53,8 @@ router_auth.post("/register", async (req, res) => {
             Nome: Nome.trim(),
             Email: Email.toLowerCase().trim(),
             Senha: hashedPassword,
-            eAdmin: false 
+            eAdmin: false,
+            tipo: 'pedagogico'
         });
 
         var token = jwt.sign(
@@ -61,8 +62,8 @@ router_auth.post("/register", async (req, res) => {
                 id: newUser.id, 
                 email: newUser.Email, 
                 nome: newUser.Nome, 
-                eAdmin: newUser.eAdmin || false,
-                tipo: newUser.tipo || 'admin'
+                eAdmin: false,
+                tipo: 'pedagogico'
             },
             process.env.SECRET || "default_secret_key",
             { expiresIn: '24h' }
@@ -76,8 +77,8 @@ router_auth.post("/register", async (req, res) => {
                 id: newUser.id,
                 nome: newUser.Nome,
                 email: newUser.Email,
-                eAdmin: newUser.eAdmin || false,
-                tipo: newUser.tipo || 'admin'
+                eAdmin: false,
+                tipo: 'pedagogico'
             }
         });
 
@@ -127,7 +128,7 @@ router_auth.post("/login", async (req, res) => {
                 email: user.Email, 
                 nome: user.Nome, 
                 eAdmin: user.eAdmin || false,
-                tipo: user.tipo || 'admin'
+                tipo: user.tipo || 'pedagogico'
             },
             process.env.SECRET || "default_secret_key",
             { expiresIn: '24h' }
@@ -142,7 +143,7 @@ router_auth.post("/login", async (req, res) => {
                 nome: user.Nome,
                 email: user.Email,
                 eAdmin: user.eAdmin || false,
-                tipo: user.tipo || 'admin'
+                tipo: user.tipo || 'pedagogico'
             }
         });
 
