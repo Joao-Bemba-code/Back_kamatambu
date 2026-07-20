@@ -11,8 +11,8 @@ const mysql = require('mysql2/promise');
   });
 
   try {
-    await conn.execute("ALTER TABLE Users MODIFY COLUMN tipo ENUM('admin','pedagogico','tesouraria') DEFAULT 'pedagogico'");
-    console.log('Default da coluna tipo alterado para pedagogico');
+    await conn.execute("ALTER TABLE Users MODIFY COLUMN tipo ENUM('admin','pedagogico','tesouraria','pendente') DEFAULT 'pendente'");
+    console.log('Default da coluna tipo alterado para pendente');
   } catch (e) {
     console.log('Erro ao alterar default:', e.message);
   }

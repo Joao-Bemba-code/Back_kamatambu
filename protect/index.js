@@ -22,12 +22,19 @@ module.exports = {
                 return res.status(401).json({ success: false, message: "Token inválido" });
             }
 
+            if (decoded.tipo === 'pendente') {
+                return res.status(403).json({
+                    success: false,
+                    message: "Conta pendente de aprovação. Aguarde um administrador."
+                });
+            }
+
             req.user = {
                 id: decoded.id,
                 email: decoded.email,
                 nome: decoded.nome,
                 eAdmin: decoded.eAdmin || false,
-                tipo: decoded.tipo || 'pedagogico'
+                tipo: decoded.tipo || 'pendente'
             };
 
             return next();

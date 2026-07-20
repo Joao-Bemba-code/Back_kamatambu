@@ -54,7 +54,7 @@ router_auth.post("/register", async (req, res) => {
             Email: Email.toLowerCase().trim(),
             Senha: hashedPassword,
             eAdmin: false,
-            tipo: 'pedagogico'
+            tipo: 'pendente'
         });
 
         var token = jwt.sign(
@@ -122,13 +122,20 @@ router_auth.post("/login", async (req, res) => {
             });
         }
 
+        if (user.tipo === 'pendente') {
+            return res.status(403).json({
+                success: false,
+                message: "A sua conta ainda não foi ativada. Aguarde a aprovação de um administrador."
+            });
+        }
+
         var token = jwt.sign(
             { 
                 id: user.id, 
                 email: user.Email, 
                 nome: user.Nome, 
                 eAdmin: user.eAdmin || false,
-                tipo: user.tipo || 'pedagogico'
+                tipo: user.tipo || 'pendente'
             },
             process.env.SECRET || "default_secret_key",
             { expiresIn: '24h' }
@@ -143,7 +150,7 @@ router_auth.post("/login", async (req, res) => {
                 nome: user.Nome,
                 email: user.Email,
                 eAdmin: user.eAdmin || false,
-                tipo: user.tipo || 'pedagogico'
+                tipo: user.tipo || 'pendente'
             }
         });
 
@@ -277,6 +284,13 @@ router_auth.get("/validar_token", async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: "Usuário não encontrado"
+            });
+        }
+
+        if (user.tipo === 'pendente') {
+            return res.status(403).json({
+                success: false,
+                message: "Conta pendente de aprovação"
             });
         }
 
