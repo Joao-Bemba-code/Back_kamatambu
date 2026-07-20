@@ -1,12 +1,17 @@
+var dotenv = require('dotenv');
+dotenv.config({path: __dirname + '/.env'});
+
+var { Name_database, User_database, Pass_database, Host_database } = process.env;
+
 const mysql = require('mysql2/promise');
 
 (async () => {
   const conn = await mysql.createConnection({
-    host: 'serverless-us-central1.sysp0000.db2.skysql.com',
+    host: Host_database,
     port: 4054,
-    user: 'dbpgf15926154',
-    password: '6]9d*7ReZZjh2vGScR0SN',
-    database: 'sgfp',
+    user: User_database,
+    password: Pass_database,
+    database: Name_database,
     ssl: { rejectUnauthorized: false }
   });
 
