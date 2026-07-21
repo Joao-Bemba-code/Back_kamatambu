@@ -34,8 +34,7 @@ router_stats.get("/dashboard", async (req, res) => {
             ],
             where: { Status: ['Inscrito', 'Admitido', 'Ativo'] },
             group: ['Curso'],
-            order: [[Sequelize.literal('total'), 'DESC']],
-            limit: 5
+            order: [[Sequelize.literal('total'), 'DESC']]
         });
 
         // Crescimento de matrículas nos últimos 6 meses
