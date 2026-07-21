@@ -26,32 +26,6 @@ router_pagamentos.get("/", async (req, res) => {
     }
 });
 
-// ========== BUSCAR PAGAMENTO POR ID ==========
-router_pagamentos.get("/:id", async (req, res) => {
-    try {
-        var { id } = req.params;
-        var pagamento = await Pagamentos.findByPk(id);
-
-        if (!pagamento) {
-            return res.status(404).json({
-                success: false,
-                message: "Pagamento não encontrado"
-            });
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: pagamento
-        });
-    } catch (error) {
-        console.error("Erro ao buscar pagamento:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Erro interno do servidor"
-        });
-    }
-});
-
 // ========== CRIAR NOVO PAGAMENTO ==========
 router_pagamentos.post("/", async (req, res) => {
     try {
@@ -432,6 +406,32 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 
     } catch (error) {
         console.error("Erro ao buscar pagamentos por status:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Erro interno do servidor"
+        });
+    }
+});
+
+// ========== BUSCAR PAGAMENTO POR ID ==========
+router_pagamentos.get("/:id", async (req, res) => {
+    try {
+        var { id } = req.params;
+        var pagamento = await Pagamentos.findByPk(id);
+
+        if (!pagamento) {
+            return res.status(404).json({
+                success: false,
+                message: "Pagamento não encontrado"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: pagamento
+        });
+    } catch (error) {
+        console.error("Erro ao buscar pagamento:", error);
         return res.status(500).json({
             success: false,
             message: "Erro interno do servidor"
