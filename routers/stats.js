@@ -99,11 +99,12 @@ router_stats.get("/dashboard", async (req, res) => {
             }
         ];
 
-        // Calcular porcentagens para inscrições por curso
+        // Inscrições por curso com contagens reais
         const totalMatriculas = matriculasPorCurso.reduce((sum, item) => sum + parseInt(item.dataValues.total), 0);
         const inscricoesPorCurso = matriculasPorCurso.map(item => ({
             name: item.dataValues.Curso || 'Outros',
-            value: totalMatriculas > 0 ? Math.round((item.dataValues.total / totalMatriculas) * 100) : 0
+            value: parseInt(item.dataValues.total),
+            percentage: totalMatriculas > 0 ? Math.round((item.dataValues.total / totalMatriculas) * 100) : 0
         }));
 
         // Se não houver dados, adicionar valores padrão
