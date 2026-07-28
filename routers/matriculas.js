@@ -122,7 +122,8 @@ router_matriculas.put("/:id", async (req, res) => {
             Turma,
             Status,
             Foto_User,
-            Foto_Certificado
+            Foto_Certificado,
+            Data_Matricula
         } = req.body;
 
         var matricula = await Matriculas.findByPk(id);
@@ -144,11 +145,12 @@ router_matriculas.put("/:id", async (req, res) => {
             Genero: Genero || matricula.Genero,
             Telefone: Telefone ? Telefone.trim() : matricula.Telefone,
             Curso: Curso ? Curso.trim() : matricula.Curso,
-            Modulo: Modulo || matricula.Modulo,
+            Modulo: Modulo ? parseInt(Modulo) : matricula.Modulo,
             Turma: Turma ? Turma.trim() : matricula.Turma,
             Status: Status || matricula.Status,
             Foto_User: Foto_User || matricula.Foto_User,
-            Foto_Certificado: Foto_Certificado || matricula.Foto_Certificado
+            Foto_Certificado: Foto_Certificado || matricula.Foto_Certificado,
+            Data_Matricula: Data_Matricula || matricula.Data_Matricula
         });
 
         return res.status(200).json({
