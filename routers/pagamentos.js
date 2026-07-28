@@ -1,7 +1,7 @@
 // routers/pagamentos.js
 const express = require("express");
 const router_pagamentos = express.Router();
-const { Pagamentos, Matriculas, Saidas } = require("../models/index.js");
+const { Pagamentos, Matriculas, Saidas, Cursos } = require("../models/index.js");
 const { Op } = require("sequelize");
 const { sequelize } = require("../config/index.js");
 
@@ -282,6 +282,36 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
             }
         });
 
+        let previsaoMesCurso = 0;
+        try {
+            const matriculasPorCurso = await Matriculas.findAll({
+                attributes: [
+                    'Curso',
+                    [sequelize.fn('COUNT', sequelize.col('Matriculas.id')), 'total']
+                ],
+                where: { Status: ['Inscrito', 'Admitido', 'Ativo'] },
+                group: ['Curso']
+            });
+
+            const cursoNomes = matriculasPorCurso.map(m => m.dataValues.Curso).filter(Boolean);
+            if (cursoNomes.length > 0) {
+                const cursos = await Cursos.findAll({
+                    where: { Nome: cursoNomes, Status: 'Ativo' }
+                });
+                const cursosMap = {};
+                cursos.forEach(c => { cursosMap[c.Nome] = parseFloat(c.Valor_curso) || 0; });
+
+                previsaoMesCurso = matriculasPorCurso.reduce((sum, item) => {
+                    const nomeCurso = item.dataValues.Curso;
+                    const qtd = parseInt(item.dataValues.total);
+                    const valor = cursosMap[nomeCurso] || 0;
+                    return sum + (qtd * valor);
+                }, 0);
+            }
+        } catch (e) {
+            console.warn("Erro ao calcular previsão por curso:", e.message);
+        }
+
         const totalPago = await Pagamentos.sum('valor', {
             where: { status: 'pago' }
         });
@@ -373,7 +403,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
                 totalAtraso: totalAtraso || 0,
                 inadimplentes: totalInadimplentes,
                 inadimplentesList: inadimplentesDetalhados,
-                previsaoMes: previsaoMes || 0,
+                previsaoMes: previsaoMesCurso || 0,
                 saldoCaixa: saldoCaixa || 0,
                 totalSaidas: totalSaidas,
                 taxaInadimplencia: parseFloat(taxaInadimplencia),
