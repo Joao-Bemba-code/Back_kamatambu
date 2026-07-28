@@ -279,9 +279,15 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
             where: { status: 'cancelado' }
         });
 
-        const totalSaidas = await Saidas.sum('valor', {
-            where: { status: 'pago' }
-        }) || 0;
+        let totalSaidas = 0;
+        try {
+            totalSaidas = await Saidas.sum('valor', {
+                where: { status: 'pago' }
+            }) || 0;
+        } catch (e) {
+            console.warn("Tabela Saidas não encontrada:", e.message);
+            totalSaidas = 0;
+        }
 
         const saldoCaixa = (totalPago || 0) - (totalCancelado || 0) - totalSaidas;
 
