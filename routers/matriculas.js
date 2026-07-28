@@ -63,7 +63,8 @@ router_matriculas.post("/", async (req, res) => {
             Turma,
             Status,
             Foto_User,
-            Foto_Certificado
+            Foto_Certificado,
+            Data_Matricula
         } = req.body;
 
         if (!Nome || !Genero || !Telefone || !Curso || !Turma) {
@@ -83,11 +84,12 @@ router_matriculas.post("/", async (req, res) => {
             Genero: Genero,
             Telefone: Telefone.trim(),
             Curso: Curso.trim(),
-            Modulo: Modulo || 1,
+            Modulo: Modulo ? parseInt(Modulo) : 1,
             Turma: Turma.trim(),
             Status: Status || 'Inscrito',
             Foto_User: Foto_User || null,
-            Foto_Certificado: Foto_Certificado || null
+            Foto_Certificado: Foto_Certificado || null,
+            Data_Matricula: Data_Matricula || new Date().toISOString().split('T')[0]
         });
 
         return res.status(201).json({
