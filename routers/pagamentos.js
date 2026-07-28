@@ -226,7 +226,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
         const hoje = new Date().toISOString().split('T')[0];
         const totalAtraso = await Pagamentos.sum('valor', {
             where: { 
-                status: 'pendente',
+                status: ['pendente', 'parcial'],
                 [Op.or]: [
                     { data_vencimento: { [Op.lt]: hoje } },
                     { data_vencimento: null }
@@ -236,7 +236,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
 
         const inadimplentesList = await Pagamentos.findAll({
             where: { 
-                status: 'pendente',
+                status: ['pendente', 'parcial'],
                 [Op.or]: [
                     { data_vencimento: { [Op.lt]: hoje } },
                     { data_vencimento: null }
@@ -265,7 +265,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
 
         const previsaoMes = await Pagamentos.sum('valor', {
             where: {
-                status: 'pendente',
+                status: ['pendente', 'parcial'],
                 data_vencimento: {
                     [Op.between]: [inicioMesStr, fimMesStr]
                 }
@@ -285,7 +285,9 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
 
         const saldoCaixa = (totalPago || 0) - (totalCancelado || 0) - totalSaidas;
 
-        const totalAlunos = await Matriculas.count();
+        const totalAlunos = await Matriculas.count({
+            where: { Status: ['Inscrito', 'Admitido', 'Ativo'] }
+        });
         const taxaInadimplencia = totalAlunos > 0 
             ? ((totalInadimplentes / totalAlunos) * 100).toFixed(1)
             : 0;
@@ -322,7 +324,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
             const pagamentos = await Pagamentos.findAll({
                 where: {
                     aluno: item.aluno,
-                    status: 'pendente'
+                    status: ['pendente', 'parcial']
                 },
                 attributes: ['valor', 'data_vencimento']
             });
