@@ -15,6 +15,7 @@ var pagamentosRoutes = require("./routers/pagamentos.js");
 const statsRoutes = require("./routers/stats.js");
 var academicoRoutes = require("./routers/academico.js");
 var criteriosRoutes = require("./routers/criteriosAvaliacao.js");
+var saidasRoutes = require("./routers/saidas.js");
 var uploadRouter = require("./routers/upload.js");
 
 var app = express();
@@ -44,6 +45,7 @@ app.use("/api/pagamentos", authenticate, pagamentosRoutes);
 app.use("/api/stats", authenticate, statsRoutes);
 app.use("/api/academico", authenticate, academicoRoutes);
 app.use("/api/criterios-avaliacao", authenticate, criteriosRoutes);
+app.use("/api/saidas", authenticate, saidasRoutes);
 app.use("/api/upload", authenticate, uploadRouter);
 
 // Rotas publicas

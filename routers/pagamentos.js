@@ -1,7 +1,7 @@
 // routers/pagamentos.js
 const express = require("express");
 const router_pagamentos = express.Router();
-const { Pagamentos, Matriculas } = require("../models/index.js");
+const { Pagamentos, Matriculas, Saidas } = require("../models/index.js");
 const { Op } = require("sequelize");
 const { sequelize } = require("../config/index.js");
 
@@ -278,7 +278,12 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
         const totalCancelado = await Pagamentos.sum('valor', {
             where: { status: 'cancelado' }
         });
-        const saldoCaixa = (totalPago || 0) - (totalCancelado || 0);
+
+        const totalSaidas = await Saidas.sum('valor', {
+            where: { status: 'pago' }
+        }) || 0;
+
+        const saldoCaixa = (totalPago || 0) - (totalCancelado || 0) - totalSaidas;
 
         const totalAlunos = await Matriculas.count();
         const taxaInadimplencia = totalAlunos > 0 
@@ -352,6 +357,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
                 inadimplentesList: inadimplentesDetalhados,
                 previsaoMes: previsaoMes || 0,
                 saldoCaixa: saldoCaixa || 0,
+                totalSaidas: totalSaidas,
                 taxaInadimplencia: parseFloat(taxaInadimplencia),
                 graficoReceitas: graficoReceitas
             }
