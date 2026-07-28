@@ -226,20 +226,30 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
         const hoje = new Date().toISOString().split('T')[0];
         const totalAtraso = await Pagamentos.sum('valor', {
             where: { 
-                status: ['pendente', 'parcial'],
                 [Op.or]: [
-                    { data_vencimento: { [Op.lt]: hoje } },
-                    { data_vencimento: null }
+                    { status: 'parcial' },
+                    { 
+                        status: 'pendente',
+                        [Op.or]: [
+                            { data_vencimento: { [Op.lt]: hoje } },
+                            { data_vencimento: null }
+                        ]
+                    }
                 ]
             }
         });
 
         const inadimplentesList = await Pagamentos.findAll({
             where: { 
-                status: ['pendente', 'parcial'],
                 [Op.or]: [
-                    { data_vencimento: { [Op.lt]: hoje } },
-                    { data_vencimento: null }
+                    { status: 'parcial' },
+                    { 
+                        status: 'pendente',
+                        [Op.or]: [
+                            { data_vencimento: { [Op.lt]: hoje } },
+                            { data_vencimento: null }
+                        ]
+                    }
                 ]
             },
             attributes: [
