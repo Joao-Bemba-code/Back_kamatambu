@@ -53,6 +53,6 @@ const Saidas = sequelize.define("Saidas", {
     timestamps: true,
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
-});
+})
 
 module.exports = Saidas;

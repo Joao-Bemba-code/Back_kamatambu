@@ -345,12 +345,14 @@ router_auth.get("/users", async (req, res) => {
 router_auth.put("/users/:id", async (req, res) => {
     try {
         var { id } = req.params;
-        var { tipo, eAdmin } = req.body;
+        var { tipo, eAdmin, Nome, Email } = req.body;
         var user = await Users.findByPk(id);
         if (!user) {
             return res.status(404).json({ success: false, message: "Utilizador não encontrado" });
         }
         var updates = {};
+        if (Nome !== undefined) updates.Nome = Nome.trim();
+        if (Email !== undefined) updates.Email = Email.trim();
         if (tipo !== undefined) updates.tipo = tipo;
         if (eAdmin !== undefined) updates.eAdmin = eAdmin;
         await user.update(updates);
