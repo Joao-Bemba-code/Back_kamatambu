@@ -38,7 +38,7 @@ router_stats.get("/dashboard", async (req, res) => {
         });
 
         // Crescimento de matrículas nos últimos 6 meses
-        const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN'];
+        const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
         const crescimento = [];
 
         for (let i = 5; i >= 0; i--) {
@@ -49,7 +49,7 @@ router_stats.get("/dashboard", async (req, res) => {
             
             const count = await Matriculas.count({
                 where: {
-                    createdAt: {
+                    Data_Matricula: {
                         [Sequelize.Op.gte]: new Date(ano, mes - 1, 1),
                         [Sequelize.Op.lt]: new Date(ano, mes, 1)
                     }
