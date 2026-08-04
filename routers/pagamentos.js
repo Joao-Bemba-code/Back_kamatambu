@@ -315,6 +315,16 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
         const totalPago = await Pagamentos.sum('valor', {
             where: { status: 'pago' }
         });
+        const totalDinheiro = await Pagamentos.sum('valor', {
+            where: {
+                status: 'pago',
+                [Op.or]: [
+                    { forma_pagamento: 'dinheiro' },
+                    { forma_pagamento: null },
+                    { forma_pagamento: '' }
+                ]
+            }
+        });
         const totalCancelado = await Pagamentos.sum('valor', {
             where: { status: 'cancelado' }
         });
@@ -400,6 +410,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
             success: true,
             data: {
                 totalArrecadado: totalArrecadado || 0,
+                totalDinheiro: totalDinheiro || 0,
                 totalAtraso: totalAtraso || 0,
                 inadimplentes: totalInadimplentes,
                 inadimplentesList: inadimplentesDetalhados,
