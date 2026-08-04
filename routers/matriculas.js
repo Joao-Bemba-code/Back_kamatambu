@@ -1,10 +1,30 @@
 const express = require("express");
 const router_matriculas = express.Router();
-const { Matriculas } = require("../models/index.js");
+const { Sequelize } = require("../config/index.js");
+const { Matriculas, Formadores, Turmas } = require("../models/index.js");
+
+async function obterTurmasDoFormador(req) {
+    var formador = null;
+    if (req.user.formador_id) {
+        formador = await Formadores.findByPk(req.user.formador_id);
+    }
+    if (!formador && req.user.nome) {
+        formador = await Formadores.findOne({ where: { Nome: req.user.nome } });
+    }
+    if (!formador) return [];
+    var turmas = await Turmas.findAll({ where: { Formador: formador.Nome } });
+    return turmas.map(t => t.Turma).filter(Boolean);
+}
 
 router_matriculas.get("/", async (req, res) => {
     try {
+        var where = {};
+        if (req.user && req.user.tipo === 'formador') {
+            var nomesTurmas = await obterTurmasDoFormador(req);
+            where = { Turma: { [Sequelize.Op.in]: nomesTurmas } };
+        }
         var matriculas = await Matriculas.findAll({
+            where,
             order: [['createdAt', 'DESC']]
         });
 

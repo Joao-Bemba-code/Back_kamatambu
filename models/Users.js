@@ -7,14 +7,22 @@ var Users = sequelize.define("Users",{
     Email:{
         type:Sequelize.STRING
     },
+    Telefone:{
+        type:Sequelize.STRING,
+        allowNull: true
+    },
     Senha:{
         type:Sequelize.TEXT
     },
     eAdmin:{
         type:Sequelize.BOOLEAN
     },
+    formador_id:{
+        type:Sequelize.INTEGER,
+        allowNull: true
+    },
     tipo:{
-        type:Sequelize.ENUM('admin', 'pedagogico', 'tesouraria', 'recursos_humanos', 'pendente'),
+        type:Sequelize.ENUM('admin', 'pedagogico', 'tesouraria', 'recursos_humanos', 'pendente', 'formador'),
         defaultValue: 'pendente'
     }
 })

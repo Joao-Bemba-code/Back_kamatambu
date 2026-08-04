@@ -2,7 +2,47 @@ var express = require("express");
 var router_auth = express.Router();
 var bcrypt = require("bcryptjs");
 var jwt = require("jsonwebtoken");
+var { Sequelize } = require("../config/index.js");
 var { Users } = require("../models/Users.js");
+
+var DEFAULT_FORMADOR_PASSWORD = "kamatambu1234";
+
+async function criarOuAtualizarUserFormador(formador) {
+    var salt = await bcrypt.genSalt(10);
+    var hashedPassword = await bcrypt.hash(DEFAULT_FORMADOR_PASSWORD, salt);
+    var telefone = formador.Telefone ? String(formador.Telefone).trim() : null;
+    var email = formador.Email ? String(formador.Email).trim().toLowerCase() : null;
+
+    var user = await Users.findOne({ where: { formador_id: formador.id } });
+    if (!user && email) {
+        user = await Users.findOne({ where: { Email: email } });
+    }
+    if (!user && telefone) {
+        user = await Users.findOne({ where: { Telefone: telefone } });
+    }
+
+    if (user) {
+        await user.update({
+            Nome: formador.Nome ? formador.Nome.trim() : user.Nome,
+            Email: email || user.Email,
+            Telefone: telefone || user.Telefone,
+            formador_id: formador.id,
+            tipo: 'formador',
+            eAdmin: false
+        });
+        return user;
+    }
+
+    return await Users.create({
+        Nome: formador.Nome ? formador.Nome.trim() : '',
+        Email: email || null,
+        Telefone: telefone || null,
+        Senha: hashedPassword,
+        eAdmin: false,
+        formador_id: formador.id,
+        tipo: 'formador'
+    });
+}
 
 router_auth.post("/register", async (req, res) => {
     try {
@@ -102,14 +142,20 @@ router_auth.post("/login", async (req, res) => {
             });
         }
 
+        var identificador = Email.toString().trim();
         var user = await Users.findOne({
-            where: { Email: Email.toLowerCase().trim() }
+            where: {
+                [Sequelize.Op.or]: [
+                    { Email: identificador.toLowerCase() },
+                    { Telefone: identificador }
+                ]
+            }
         });
 
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: "Email ou senha incorretos"
+                message: "Email/Telefone ou senha incorretos"
             });
         }
 
@@ -118,7 +164,7 @@ router_auth.post("/login", async (req, res) => {
         if (!isValidPassword) {
             return res.status(401).json({
                 success: false,
-                message: "Email ou senha incorretos"
+                message: "Email/Telefone ou senha incorretos"
             });
         }
 
@@ -133,6 +179,8 @@ router_auth.post("/login", async (req, res) => {
             { 
                 id: user.id, 
                 email: user.Email, 
+                telefone: user.Telefone || null,
+                formador_id: user.formador_id || null,
                 nome: user.Nome, 
                 eAdmin: user.eAdmin || false,
                 tipo: user.tipo || 'pendente'
@@ -149,6 +197,8 @@ router_auth.post("/login", async (req, res) => {
                 id: user.id,
                 nome: user.Nome,
                 email: user.Email,
+                telefone: user.Telefone || null,
+                formador_id: user.formador_id || null,
                 eAdmin: user.eAdmin || false,
                 tipo: user.tipo || 'pendente'
             }
@@ -389,3 +439,4 @@ router_auth.put("/users/:id/senha", async (req, res) => {
 });
 
 module.exports = router_auth;
+module.exports.syncFormadorUser = criarOuAtualizarUserFormador;

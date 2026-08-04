@@ -3,6 +3,20 @@ const router_stats = express.Router();
 const { Matriculas, Turmas, Cursos, Formadores } = require("../models/index.js");
 const { Sequelize } = require("sequelize");
 
+async function obterTurmasDoFormador(req) {
+    if (!req.user || req.user.tipo !== 'formador') return null;
+    var formador = null;
+    if (req.user.formador_id) {
+        formador = await Formadores.findByPk(req.user.formador_id);
+    }
+    if (!formador && req.user.nome) {
+        formador = await Formadores.findOne({ where: { Nome: req.user.nome } });
+    }
+    if (!formador) return [];
+    var turmas = await Turmas.findAll({ where: { Formador: formador.Nome } });
+    return turmas.map(t => t.Turma).filter(Boolean);
+}
+
 // ========== ESTATÍSTICAS DO DASHBOARD ==========
 router_stats.get("/dashboard", async (req, res) => {
     try {
@@ -118,8 +132,13 @@ router_stats.get("/dashboard", async (req, res) => {
         }
 
         // Matrículas recentes (últimas 5)
+        const nomesTurmasFormador = await obterTurmasDoFormador(req);
+        const matriculaWhereRecentes = nomesTurmasFormador
+            ? { Turma: { [Sequelize.Op.in]: nomesTurmasFormador } }
+            : {};
         const matriculasRecentes = await Matriculas.findAll({
             limit: 5,
+            where: matriculaWhereRecentes,
             order: [['createdAt', 'DESC']],
             attributes: ['id', 'Nome', 'Curso', 'Turma', 'Status', 'createdAt']
         });

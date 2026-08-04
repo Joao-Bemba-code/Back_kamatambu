@@ -1,6 +1,9 @@
 const express = require("express");
 const router_formadores = express.Router();
 const { Formadores, Turmas } = require("../models/index.js");
+const { Users } = require("../models/Users.js");
+const authRouter = require("./users.js");
+const syncFormadorUser = authRouter.syncFormadorUser;
 
 // ========== LISTA SIMPLIFICADA ==========
 router_formadores.get("/lista", async (req, res) => {
@@ -145,9 +148,11 @@ router_formadores.post("/", async (req, res) => {
             Data_Contratacao: Data_Contratacao || new Date()
         });
 
+        await syncFormadorUser(newFormador);
+
         return res.status(201).json({
             success: true,
-            message: "Formador criado com sucesso",
+            message: "Formador criado com sucesso. Credenciais de acesso geradas (senha padrão: kamatambu1234).",
             data: newFormador
         });
 
@@ -234,6 +239,8 @@ router_formadores.put("/:id", async (req, res) => {
             Data_Contratacao: Data_Contratacao || formador.Data_Contratacao
         });
 
+        await syncFormadorUser(formador);
+
         return res.status(200).json({
             success: true,
             message: "Formador atualizado com sucesso",
@@ -263,6 +270,8 @@ router_formadores.delete("/:id", async (req, res) => {
         }
 
         await formador.destroy();
+
+        await Users.destroy({ where: { formador_id: formador.id } });
 
         return res.status(200).json({
             success: true,

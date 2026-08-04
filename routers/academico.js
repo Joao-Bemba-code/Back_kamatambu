@@ -1,14 +1,47 @@
 // routers/academico.js (VERSÃO SIMPLIFICADA)
 const express = require("express");
 const router_academico = express.Router();
-const { Notas, Matriculas } = require("../models/index.js");
+const { Sequelize } = require("../config/index.js");
+const { Notas, Matriculas, Formadores, Turmas, CriteriosAvaliacao } = require("../models/index.js");
+
+// ========== HELPERS ==========
+
+// Retorna o Formador e as turmas onde ele leciona (por nome)
+async function obterDadosFormador(req) {
+    var formador = null;
+    if (req.user.formador_id) {
+        formador = await Formadores.findByPk(req.user.formador_id);
+    }
+    if (!formador && req.user.nome) {
+        formador = await Formadores.findOne({ where: { Nome: req.user.nome } });
+    }
+    if (!formador) return { formador: null, turmas: [], nomesTurmas: [] };
+    var turmas = await Turmas.findAll({ where: { Formador: formador.Nome } });
+    var nomesTurmas = turmas.map(t => t.Turma).filter(Boolean);
+    return { formador, turmas, nomesTurmas };
+}
+
+function ehFormador(req) {
+    return req.user && req.user.tipo === 'formador';
+}
 
 // ========== NOTAS ==========
 
 // Listar todas as notas
 router_academico.get("/notas", async (req, res) => {
     try {
+        var where = {};
+        if (ehFormador(req)) {
+            var dados = await obterDadosFormador(req);
+            where = {
+                [Sequelize.Op.or]: [
+                    { formador_id: req.user.formador_id || null },
+                    { turma: { [Sequelize.Op.in]: dados.nomesTurmas } }
+                ]
+            };
+        }
         const notas = await Notas.findAll({
+            where,
             order: [['createdAt', 'DESC']]
         });
         return res.status(200).json({
@@ -29,8 +62,19 @@ router_academico.get("/notas", async (req, res) => {
 router_academico.get("/notas/aluno/:aluno_id", async (req, res) => {
     try {
         const { aluno_id } = req.params;
+        var where = { aluno_id: parseInt(aluno_id) };
+        if (ehFormador(req)) {
+            var dados = await obterDadosFormador(req);
+            var matricula = await Matriculas.findByPk(parseInt(aluno_id));
+            if (!matricula || !dados.nomesTurmas.includes(matricula.Turma)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Acesso negado: este formando não pertence às suas turmas"
+                });
+            }
+        }
         const notas = await Notas.findAll({
-            where: { aluno_id: parseInt(aluno_id) },
+            where,
             order: [['createdAt', 'DESC']]
         });
         return res.status(200).json({
@@ -73,6 +117,17 @@ router_academico.post("/notas", async (req, res) => {
             if (!alunoNome) alunoNome = matricula.Nome;
             if (!cursoNome) cursoNome = matricula.Curso;
             if (!turmaNome) turmaNome = matricula.Turma;
+
+            // Formador só pode avaliar formandos das suas turmas
+            if (ehFormador(req)) {
+                var dados = await obterDadosFormador(req);
+                if (!dados.nomesTurmas.includes(matricula.Turma)) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "Acesso negado: só pode avaliar formandos das suas turmas"
+                    });
+                }
+            }
         }
 
         // Calcular status
@@ -81,6 +136,13 @@ router_academico.post("/notas", async (req, res) => {
         if (notaNum >= 10) status = 'aprovado';
         else if (notaNum >= 7) status = 'recuperacao';
         else if (notaNum < 7) status = 'reprovado';
+
+        var formadorIdSalvo = formador_id || null;
+        var formadorNomeSalvo = formador || null;
+        if (ehFormador(req)) {
+            formadorIdSalvo = req.user.formador_id || formadorIdSalvo;
+            formadorNomeSalvo = req.user.nome || formadorNomeSalvo;
+        }
 
         const newNota = await Notas.create({
             aluno_id: parseInt(aluno_id),
@@ -94,8 +156,8 @@ router_academico.post("/notas", async (req, res) => {
             peso: peso || 1.00,
             data_avaliacao: data_avaliacao || null,
             observacao: observacao || null,
-            formador_id: formador_id || null,
-            formador: formador || null,
+            formador_id: formadorIdSalvo,
+            formador: formadorNomeSalvo,
             status: status
         });
 
@@ -126,6 +188,16 @@ router_academico.put("/notas/:id", async (req, res) => {
                 success: false,
                 message: "Nota não encontrada"
             });
+        }
+
+        if (ehFormador(req)) {
+            var dados = await obterDadosFormador(req);
+            if (!dados.nomesTurmas.includes(notaExistente.turma)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Acesso negado: esta avaliação não pertence às suas turmas"
+                });
+            }
         }
 
         let novoStatus = notaExistente.status;
@@ -171,6 +243,16 @@ router_academico.delete("/notas/:id", async (req, res) => {
             });
         }
 
+        if (ehFormador(req)) {
+            var dados = await obterDadosFormador(req);
+            if (!dados.nomesTurmas.includes(nota.turma)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Acesso negado: esta avaliação não pertence às suas turmas"
+                });
+            }
+        }
+
         await nota.destroy();
         return res.status(200).json({
             success: true,
@@ -183,6 +265,47 @@ router_academico.delete("/notas/:id", async (req, res) => {
             success: false,
             message: "Erro interno do servidor"
         });
+    }
+});
+
+// ========== PAINEL DO FORMADOR ==========
+// Retorna formador, suas turmas, formandos dessas turmas e as suas avaliações
+router_academico.get("/formador", async (req, res) => {
+    try {
+        if (!ehFormador(req)) {
+            return res.status(403).json({ success: false, message: "Acesso restrito a formadores" });
+        }
+
+        var dados = await obterDadosFormador(req);
+        if (!dados.formador) {
+            return res.status(404).json({ success: false, message: "Formador não encontrado" });
+        }
+
+        var alunos = await Matriculas.findAll({
+            where: { Turma: { [Sequelize.Op.in]: dados.nomesTurmas } },
+            order: [['Nome', 'ASC']]
+        });
+
+        var notas = await Notas.findAll({
+            where: { Turma: { [Sequelize.Op.in]: dados.nomesTurmas } },
+            order: [['createdAt', 'DESC']]
+        });
+
+        var criterios = await CriteriosAvaliacao.findAll();
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                formador: dados.formador,
+                turmas: dados.turmas,
+                alunos: alunos,
+                notas: notas,
+                criterios: criterios
+            }
+        });
+    } catch (error) {
+        console.error("Erro ao carregar painel do formador:", error);
+        return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
 });
 

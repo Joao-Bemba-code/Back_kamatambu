@@ -32,6 +32,8 @@ module.exports = {
             req.user = {
                 id: decoded.id,
                 email: decoded.email,
+                telefone: decoded.telefone || null,
+                formador_id: decoded.formador_id || null,
                 nome: decoded.nome,
                 eAdmin: decoded.eAdmin || false,
                 tipo: decoded.tipo || 'pendente'
