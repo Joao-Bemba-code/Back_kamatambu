@@ -1,11 +1,23 @@
 const express = require("express");
 const router_turmas = express.Router();
-const { Turmas, Matriculas } = require("../models/index.js");
+const { Turmas, Matriculas, Formadores } = require("../models/index.js");
 
 // ========== GET - Listar todas as turmas ==========
 router_turmas.get("/", async (req, res) => {
     try {
+        var where = {};
+        if (req.user && req.user.tipo === 'formador') {
+            var formador = null;
+            if (req.user.formador_id) {
+                formador = await Formadores.findByPk(req.user.formador_id);
+            }
+            if (!formador && req.user.nome) {
+                formador = await Formadores.findOne({ where: { Nome: req.user.nome } });
+            }
+            where = formador ? { Formador: formador.Nome } : { Formador: '__none__' };
+        }
         var turmas = await Turmas.findAll({
+            where,
             order: [['createdAt', 'DESC']]
         });
 
