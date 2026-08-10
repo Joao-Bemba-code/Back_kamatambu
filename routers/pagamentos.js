@@ -46,14 +46,16 @@ router_pagamentos.post("/", async (req, res) => {
             multa
         } = req.body;
 
-        if (!aluno) {
+        var ehVenda = (tipo || 'mensalidade') === 'venda';
+
+        if (!ehVenda && !aluno) {
             return res.status(400).json({
                 success: false,
                 message: "O nome do aluno é obrigatório"
             });
         }
 
-        if (!curso) {
+        if (!ehVenda && !curso) {
             return res.status(400).json({
                 success: false,
                 message: "O curso é obrigatório"
@@ -78,9 +80,9 @@ router_pagamentos.post("/", async (req, res) => {
         }
 
         var newPagamento = await Pagamentos.create({
-            aluno: aluno.trim(),
+            aluno: aluno ? aluno.trim() : null,
             aluno_id: aluno_id || null,
-            curso: curso.trim(),
+            curso: curso ? curso.trim() : null,
             turma: turma || null,
             tipo: tipo || 'mensalidade',
             forma_pagamento: forma_pagamento || 'dinheiro',
@@ -147,10 +149,12 @@ router_pagamentos.put("/:id", async (req, res) => {
             });
         }
 
+        var ehVendaAtualizacao = (tipo || pagamento.tipo) === 'venda';
+
         await pagamento.update({
-            aluno: aluno ? aluno.trim() : pagamento.aluno,
+            aluno: aluno ? aluno.trim() : (ehVendaAtualizacao ? null : pagamento.aluno),
             aluno_id: aluno_id || pagamento.aluno_id,
-            curso: curso ? curso.trim() : pagamento.curso,
+            curso: curso ? curso.trim() : (ehVendaAtualizacao ? null : pagamento.curso),
             turma: turma || pagamento.turma,
             tipo: tipo || pagamento.tipo,
             forma_pagamento: forma_pagamento || pagamento.forma_pagamento,
@@ -226,6 +230,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
         const hoje = new Date().toISOString().split('T')[0];
         const totalAtraso = await Pagamentos.sum('valor', {
             where: { 
+                tipo: { [Op.ne]: 'venda' },
                 [Op.or]: [
                     { status: 'parcial' },
                     { 
@@ -241,6 +246,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
 
         const inadimplentesList = await Pagamentos.findAll({
             where: { 
+                tipo: { [Op.ne]: 'venda' },
                 [Op.or]: [
                     { status: 'parcial' },
                     { 
@@ -275,6 +281,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
 
         const previsaoMes = await Pagamentos.sum('valor', {
             where: {
+                tipo: { [Op.ne]: 'venda' },
                 status: ['pendente', 'parcial'],
                 data_vencimento: {
                     [Op.between]: [inicioMesStr, fimMesStr]

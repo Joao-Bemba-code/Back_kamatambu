@@ -9,7 +9,7 @@ const Pagamentos = sequelize.define("Pagamentos", {
     },
     aluno: {
         type: Sequelize.STRING(100),
-        allowNull: false,
+        allowNull: true,
         validate: {
             notEmpty: { msg: "O nome do aluno é obrigatório" }
         }
@@ -20,7 +20,7 @@ const Pagamentos = sequelize.define("Pagamentos", {
     },
     curso: {
         type: Sequelize.STRING(100),
-        allowNull: false,
+        allowNull: true,
         validate: {
             notEmpty: { msg: "O curso é obrigatório" }
         }
@@ -30,7 +30,7 @@ const Pagamentos = sequelize.define("Pagamentos", {
         allowNull: true
     },
     tipo: {
-        type: Sequelize.ENUM("matricula", "mensalidade", "certificado", "taxa", "outro"),
+        type: Sequelize.ENUM("matricula", "mensalidade", "certificado", "taxa", "venda", "outro"),
         allowNull: false,
         defaultValue: "mensalidade"
     },
