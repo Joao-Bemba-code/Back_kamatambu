@@ -499,18 +499,21 @@ router_pagamentos.get("/status/:status", async (req, res) => {
     }
 });
 
-// ========== DÍVIDAS POR CURSO MULTI-MÊS ==========
-// Lista os formandos matriculados em cursos com mais de 1 mês (Modulos > 1)
-// que ainda possuem mensalidades em aberto (pendente ou parcial).
-// Para cada formando mostra quantos meses deve, o valor total e o detalhe por mês.
+// ========== DÍVIDAS POR CURSO ==========
+// Lista os formandos ADMITIDOS/ATIVO no curso English (multi-mês) e calcula as
+// mensalidades em aberto dinamicamente: gera os meses de referência desde a data
+// de matrícula até ao mês corrente e considera um mês como dívida quando não há
+// nenhum registo de pagamento (data_pagamento ou pagamento com data_vencimento
+// no mês) associado a esse formando.
 router_pagamentos.get("/dividas", async (req, res) => {
     try {
         var hoje = new Date();
-        var hojeStr = hoje.toISOString().split('T')[0];
+        var mesAtual = hoje.getMonth() + 1;
+        var anoAtual = hoje.getFullYear();
 
-        // Matrículas com status ativo/inscrito
+        // Matrículas admitidas/ativo (formandos em curso activo)
         var matriculas = await Matriculas.findAll({
-            where: { Status: ['Inscrito', 'Admitido', 'Ativo'] }
+            where: { Status: ['Admitido', 'Ativo'] }
         });
 
         // Mapeia cursos: Nome -> { Modulos, Valor_curso }
@@ -532,42 +535,70 @@ router_pagamentos.get("/dividas", async (req, res) => {
         });
 
         var dividas = await Promise.all(matriculasMultiMes.map(async function (m) {
+            var info = cursoModulos[m.Curso];
+            var valorMensal = parseFloat(info.Valor_curso) || 0;
+
+            // Meses de referência: do mês da matrícula até ao mês corrente (inclusive)
+            var mesesRefs = [];
+            var dataInicio = m.Data_Matricula ? new Date(m.Data_Matricula) : new Date();
+            if (isNaN(dataInicio.getTime())) dataInicio = new Date();
+            var cy = dataInicio.getFullYear();
+            var cm = dataInicio.getMonth() + 1;
+            while (cy < anoAtual || (cy === anoAtual && cm <= mesAtual)) {
+                mesesRefs.push({ y: cy, m: cm });
+                cm++;
+                if (cm > 12) { cm = 1; cy++; }
+            }
+
+            // Pagamentos deste formando (mensalidades) -> meses já pagos
             var pagamentos = await Pagamentos.findAll({
                 where: {
                     [Op.or]: [
                         { aluno_id: m.id },
                         { aluno: m.Nome, aluno_id: null }
                     ],
-                    tipo: 'mensalidade',
-                    status: ['pendente', 'parcial']
+                    tipo: 'mensalidade'
                 },
-                order: [['data_vencimento', 'ASC']]
+                attributes: ['id', 'data_pagamento', 'data_vencimento', 'valor', 'status']
             });
-
-            if (!pagamentos || pagamentos.length === 0) return null;
-
-            var meses = pagamentos.map(function (p) {
-                var label = 'Mês desconhecido';
-                var refMes = null;
-                if (p.data_vencimento) {
-                    var d = new Date(p.data_vencimento);
-                    label = d.toLocaleString('pt-PT', { month: 'long', year: 'numeric' });
-                    refMes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            var mesesPagos = {};
+            pagamentos.forEach(function (p) {
+                var fontePago = p.data_pagamento;
+                var fonteVenc = p.data_vencimento;
+                if (fontePago) {
+                    var dp = new Date(fontePago);
+                    if (!isNaN(dp.getTime())) {
+                        mesesPagos[dp.getFullYear() + '-' + String(dp.getMonth() + 1).padStart(2, '0')] = true;
+                    }
                 }
-                return {
-                    id: p.id,
-                    ref_mes: refMes,
-                    label: label,
-                    data_vencimento: p.data_vencimento,
-                    valor: p.valor,
-                    status: p.status,
-                    vencida: p.data_vencimento ? (p.data_vencimento <= hojeStr) : true
-                };
+                if (p.status === 'pago' && fonteVenc) {
+                    var dv = new Date(fonteVenc);
+                    if (!isNaN(dv.getTime())) {
+                        mesesPagos[dv.getFullYear() + '-' + String(dv.getMonth() + 1).padStart(2, '0')] = true;
+                    }
+                }
             });
 
-            var totalDivida = pagamentos.reduce(function (s, p) {
-                return s + parseFloat(p.valor || 0);
-            }, 0);
+            // Dívida = meses de referência sem pagamento
+            var meses = mesesRefs.map(function (ref) {
+                var venc = new Date(ref.y, ref.m - 1, 1);
+                var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
+                var pago = !!mesesPagos[refKey];
+                return {
+                    ref_mes: refKey,
+                    label: venc.toLocaleString('pt-PT', { month: 'long', year: 'numeric' }),
+                    data_vencimento: venc.toISOString().split('T')[0],
+                    valor: valorMensal,
+                    status: pago ? 'pago' : 'pendente',
+                    pago: pago,
+                    vencida: !pago,
+                    id: null
+                };
+            }).filter(function (mm) { return !mm.pago; });
+
+            if (!meses || meses.length === 0) return null;
+
+            var totalDivida = meses.length * valorMensal;
 
             return {
                 id: m.id,
@@ -576,7 +607,7 @@ router_pagamentos.get("/dividas", async (req, res) => {
                 curso: m.Curso,
                 turma: m.Turma,
                 telefone: m.Telefone,
-                modulos_curso: cursoModulos[m.Curso] ? cursoModulos[m.Curso].Modulos : 0,
+                modulos_curso: info ? info.Modulos : 0,
                 total_meses_devidos: meses.length,
                 total_divida: parseFloat(totalDivida.toFixed(2)),
                 meses: meses,
