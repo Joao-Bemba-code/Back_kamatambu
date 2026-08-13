@@ -5,6 +5,14 @@ const { Pagamentos, Matriculas, Saidas, Cursos } = require("../models/index.js")
 const { Op } = require("sequelize");
 const { sequelize } = require("../config/index.js");
 
+// ===== Limite inicial: só o curso "English" gera/conta como dívida de mensalidade =====
+var CURSOS_COM_MENSALIDADES = ['english'];
+var isCursoComMensalidade = function (nome) {
+    if (!nome) return false;
+    var n = String(nome).toLowerCase();
+    return CURSOS_COM_MENSALIDADES.some(function (c) { return n === c; });
+};
+
 // ========== LISTAR TODOS OS PAGAMENTOS ==========
 router_pagamentos.get("/", async (req, res) => {
     try {
@@ -520,7 +528,7 @@ router_pagamentos.get("/dividas", async (req, res) => {
         // Apenas formandos em cursos multi-mês (Modulos > 1)
         var matriculasMultiMes = matriculas.filter(function (m) {
             var info = cursoModulos[m.Curso];
-            return info && info.Modulos > 1;
+            return info && info.Modulos > 1 && isCursoComMensalidade(m.Curso);
         });
 
         var dividas = await Promise.all(matriculasMultiMes.map(async function (m) {

@@ -3,6 +3,14 @@ const router_matriculas = express.Router();
 const { Sequelize } = require("../config/index.js");
 const { Matriculas, Formadores, Turmas, Pagamentos, Cursos } = require("../models/index.js");
 
+// ===== Limite inicial: só o curso "English" gera dívida de mensalidade =====
+var CURSOS_COM_MENSALIDADES = ['english'];
+var isCursoComMensalidade = function (nome) {
+    if (!nome) return false;
+    var n = String(nome).toLowerCase();
+    return CURSOS_COM_MENSALIDADES.some(function (c) { return n === c; });
+};
+
 async function obterTurmasDoFormador(req) {
     var formador = null;
     if (req.user.formador_id) {
@@ -119,7 +127,7 @@ router_matriculas.post("/", async (req, res) => {
         var mensalidadesCriadas = 0;
         try {
             var cursoInfo = await Cursos.findOne({ where: { Nome: newMatricula.Curso } });
-            if (cursoInfo && parseInt(cursoInfo.Modulos) > 1) {
+            if (cursoInfo && parseInt(cursoInfo.Modulos) > 1 && isCursoComMensalidade(cursoInfo.Nome)) {
                 var modulos = parseInt(cursoInfo.Modulos);
                 var valorMensal = parseFloat(cursoInfo.Valor_curso) || 0;
                 if (valorMensal > 0) {
