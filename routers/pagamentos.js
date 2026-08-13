@@ -491,6 +491,113 @@ router_pagamentos.get("/status/:status", async (req, res) => {
     }
 });
 
+// ========== DÍVIDAS POR CURSO MULTI-MÊS ==========
+// Lista os formandos matriculados em cursos com mais de 1 mês (Modulos > 1)
+// que ainda possuem mensalidades em aberto (pendente ou parcial).
+// Para cada formando mostra quantos meses deve, o valor total e o detalhe por mês.
+router_pagamentos.get("/dividas", async (req, res) => {
+    try {
+        var hoje = new Date();
+        var hojeStr = hoje.toISOString().split('T')[0];
+
+        // Matrículas com status ativo/inscrito
+        var matriculas = await Matriculas.findAll({
+            where: { Status: ['Inscrito', 'Admitido', 'Ativo'] }
+        });
+
+        // Mapeia cursos: Nome -> { Modulos, Valor_curso }
+        var cursos = await Cursos.findAll({
+            attributes: ['Nome', 'Modulos', 'Valor_curso']
+        });
+        var cursoModulos = {};
+        cursos.forEach(function (c) {
+            cursoModulos[c.Nome] = {
+                Modulos: parseInt(c.Modulos) || 1,
+                Valor_curso: c.Valor_curso
+            };
+        });
+
+        // Apenas formandos em cursos multi-mês (Modulos > 1)
+        var matriculasMultiMes = matriculas.filter(function (m) {
+            var info = cursoModulos[m.Curso];
+            return info && info.Modulos > 1;
+        });
+
+        var dividas = await Promise.all(matriculasMultiMes.map(async function (m) {
+            var pagamentos = await Pagamentos.findAll({
+                where: {
+                    [Op.or]: [
+                        { aluno_id: m.id },
+                        { aluno: m.Nome, aluno_id: null }
+                    ],
+                    tipo: 'mensalidade',
+                    status: ['pendente', 'parcial']
+                },
+                order: [['data_vencimento', 'ASC']]
+            });
+
+            if (!pagamentos || pagamentos.length === 0) return null;
+
+            var meses = pagamentos.map(function (p) {
+                var label = 'Mês desconhecido';
+                var refMes = null;
+                if (p.data_vencimento) {
+                    var d = new Date(p.data_vencimento);
+                    label = d.toLocaleString('pt-PT', { month: 'long', year: 'numeric' });
+                    refMes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                }
+                return {
+                    id: p.id,
+                    ref_mes: refMes,
+                    label: label,
+                    data_vencimento: p.data_vencimento,
+                    valor: p.valor,
+                    status: p.status,
+                    vencida: p.data_vencimento ? (p.data_vencimento <= hojeStr) : true
+                };
+            });
+
+            var totalDivida = pagamentos.reduce(function (s, p) {
+                return s + parseFloat(p.valor || 0);
+            }, 0);
+
+            return {
+                id: m.id,
+                aluno: m.Nome,
+                aluno_id: m.id,
+                curso: m.Curso,
+                turma: m.Turma,
+                telefone: m.Telefone,
+                modulos_curso: cursoModulos[m.Curso] ? cursoModulos[m.Curso].Modulos : 0,
+                total_meses_devidos: meses.length,
+                total_divida: parseFloat(totalDivida.toFixed(2)),
+                meses: meses,
+                pagamentos: pagamentos.map(function (p) { return p.get({ plain: true }); })
+            };
+        }));
+
+        var data = dividas.filter(Boolean);
+
+        var totalDevedores = data.length;
+        var totalMesesDivida = data.reduce(function (s, d) { return s + d.total_meses_devidos; }, 0);
+        var totalValorDivida = data.reduce(function (s, d) { return s + d.total_divida; }, 0);
+
+        return res.status(200).json({
+            success: true,
+            total_devedores: totalDevedores,
+            total_meses_divida: totalMesesDivida,
+            total_valor_divida: parseFloat(totalValorDivida.toFixed(2)),
+            data: data
+        });
+    } catch (error) {
+        console.error("Erro ao buscar dívidas:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Erro interno do servidor"
+        });
+    }
+});
+
 // ========== BUSCAR PAGAMENTO POR ID ==========
 router_pagamentos.get("/:id", async (req, res) => {
     try {

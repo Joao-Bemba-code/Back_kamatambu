@@ -1,7 +1,7 @@
 const express = require("express");
 const router_matriculas = express.Router();
 const { Sequelize } = require("../config/index.js");
-const { Matriculas, Formadores, Turmas } = require("../models/index.js");
+const { Matriculas, Formadores, Turmas, Pagamentos, Cursos } = require("../models/index.js");
 
 async function obterTurmasDoFormador(req) {
     var formador = null;
@@ -112,10 +112,59 @@ router_matriculas.post("/", async (req, res) => {
             Data_Matricula: Data_Matricula || new Date().toISOString().split('T')[0]
         });
 
+        // ===== Auto-criar mensalidades para cursos multi-mês (Modulos > 1) =====
+        // Lógica: o pagamento é mensal. O mês 1 vence na data da matrícula e os
+        // meses seguintes vencem no dia 1 de cada mês subsequente, até fechar o
+        // ciclo de X meses. A dívida é sempre que o mês não foi pago.
+        var mensalidadesCriadas = 0;
+        try {
+            var cursoInfo = await Cursos.findOne({ where: { Nome: newMatricula.Curso } });
+            if (cursoInfo && parseInt(cursoInfo.Modulos) > 1) {
+                var modulos = parseInt(cursoInfo.Modulos);
+                var valorMensal = parseFloat(cursoInfo.Valor_curso) || 0;
+                if (valorMensal > 0) {
+                    var dataMat = new Date(newMatricula.Data_Matricula);
+                    for (var k = 1; k <= modulos; k++) {
+                        var vencimento;
+                        if (k === 1) {
+                            vencimento = new Date(dataMat);
+                        } else {
+                            vencimento = new Date(dataMat.getFullYear(), dataMat.getMonth() + (k - 1), 1);
+                        }
+                        var vencStr = vencimento.toISOString().split('T')[0];
+                        var refMes = vencimento.getFullYear() + '-' + String(vencimento.getMonth() + 1).padStart(2, '0');
+                        var mesNome = vencimento.toLocaleString('pt-PT', { month: 'long', year: 'numeric' });
+                        await Pagamentos.create({
+                            aluno: newMatricula.Nome,
+                            aluno_id: newMatricula.id,
+                            curso: newMatricula.Curso,
+                            turma: newMatricula.Turma,
+                            tipo: 'mensalidade',
+                            forma_pagamento: 'dinheiro',
+                            valor: valorMensal,
+                            status: 'pendente',
+                            data_pagamento: null,
+                            data_vencimento: vencStr,
+                            observacao: 'Mensalidade automatica - Modulo ' + k + ' de ' + modulos + ' (' + mesNome + ')'
+                        });
+                        mensalidadesCriadas++;
+                    }
+                }
+            }
+        } catch (errAuto) {
+            console.warn('Nao foi possivel auto-criar mensalidades:', errAuto.message);
+        }
+
+        var mensagemFinal = 'Matricula criada com sucesso';
+        if (mensalidadesCriadas > 0) {
+            mensagemFinal += '. ' + mensalidadesCriadas + ' mensalidade(s) automatica(s) gerada(s) para o curso multi-mes';
+        }
+
         return res.status(201).json({
             success: true,
-            message: "Matrícula criada com sucesso",
-            data: newMatricula
+            message: mensagemFinal,
+            data: newMatricula,
+            mensalidadesCriadas: mensalidadesCriadas
         });
 
     } catch (error) {
