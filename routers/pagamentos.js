@@ -498,9 +498,8 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 // - Os meses de referência vão do início da formação (data de início da turma
 //   activa ou, na falta, data de matrícula) até ao mês corrente, limitados ao
 //   número de modulos (meses) do curso.
-// - O vencimento de cada mensalidade é no dia 5 do mês de referência, com
-//   prazo de 1 mês (até dia 5 do mês seguinte). A partir do dia 6 do mês
-//   seguinte, a mensalidade não paga é considerada dívida.
+// - O vencimento de cada mensalidade é no dia 5 do mês de referência; a
+//   partir do dia 6 do próprio mês, a mensalidade não paga é considerada dívida.
 // - Cada pagamento cobre apenas UM mês (o mês da data de pagamento).
 router_pagamentos.get("/dividas", async (req, res) => {
     try {
@@ -593,24 +592,18 @@ router_pagamentos.get("/dividas", async (req, res) => {
             });
 
             // Dívida = meses de referência sem pagamento
-            // Vencimento no dia 5 do mês de referência, prazo de 1 mês (até dia 5
-            // do mês seguinte). A partir do dia 6 do mês seguinte, a mensalidade
-            // não paga é considerada dívida.
+            // Vencimento no dia 5 do mês de referência; a partir do dia 6 do
+            // próprio mês, a mensalidade não paga é considerada dívida.
             var meses = mesesRefs.map(function (ref) {
                 var venc = new Date(ref.y, ref.m - 1, 5);
                 var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
                 var dataVencStr = refKey + '-05';
                 var pago = !!mesesPagos[refKey];
 
-                var seguinteAno = ref.m === 12 ? ref.y + 1 : ref.y;
-                var seguinteMes = ref.m === 12 ? 1 : ref.m + 1;
-                var passouPrazo = seguinteAno < anoAtual ||
-                    (seguinteAno === anoAtual && (seguinteMes < mesAtual || (seguinteMes === mesAtual && diaAtual >= 6)));
+                var passouDia6 = (ref.y < anoAtual) ||
+                    (ref.y === anoAtual && (ref.m < mesAtual || (ref.m === mesAtual && diaAtual >= 6)));
 
-                var vencida = !pago;
-                if (!pago && !passouPrazo) {
-                    vencida = false;
-                }
+                var vencida = !pago && passouDia6;
 
                 return {
                     ref_mes: refKey,

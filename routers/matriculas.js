@@ -116,10 +116,10 @@ router_matriculas.post("/", async (req, res) => {
         // Lógica: o pagamento é mensal. O valor de cada mensalidade é o
         // Valor_curso (pagamento mensal). O mês 1 vence no dia 5 do mês de
         // referência e os meses seguintes vencem no dia 5 de cada mês
-        // subsequente, até fechar o ciclo de X meses. Cada mensalidade tem prazo
-        // de 1 mês (até dia 5 do mês seguinte); a partir do dia 6 do mês
-        // seguinte é considerada dívida. O mês de referência inicial é o mês de
-        // início da turma quando disponível, senão o mês da matrícula.
+        // subsequente, até fechar o ciclo de X meses. O vencimento é no dia 5
+        // de cada mês; a partir do dia 6 do próprio mês a mensalidade não paga
+        // é considerada dívida. O mês de referência inicial é o mês de início
+        // da turma quando disponível, senão o mês da matrícula.
         var mensalidadesCriadas = 0;
         try {
             var cursoInfo = await Cursos.findOne({ where: { Nome: newMatricula.Curso } });
