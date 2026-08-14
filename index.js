@@ -48,6 +48,18 @@ app.use("/api/criterios-avaliacao", authenticate, criteriosRoutes);
 app.use("/api/saidas", authenticate, saidasRoutes);
 app.use("/api/upload", authenticate, uploadRouter);
 
+// Rotas protegidas sem prefixo /api (compatibilidade com frontend)
+app.use("/formadores", authenticate, formadoresRoutes);
+app.use("/matriculas", authenticate, matriculasRoutes);
+app.use("/turmas", authenticate, turmasRoutes);
+app.use("/cursos", authenticate, cursosRoutes);
+app.use("/pagamentos", authenticate, pagamentosRoutes);
+app.use("/stats", authenticate, statsRoutes);
+app.use("/academico", authenticate, academicoRoutes);
+app.use("/criterios-avaliacao", authenticate, criteriosRoutes);
+app.use("/saidas", authenticate, saidasRoutes);
+app.use("/upload", authenticate, uploadRouter);
+
 // Rotas publicas
 app.get("/test", (req, res) => {
     console.log("Rota /test chamada!");
