@@ -112,26 +112,26 @@ router_matriculas.post("/", async (req, res) => {
             Data_Matricula: Data_Matricula || new Date().toISOString().split('T')[0]
         });
 
-        // ===== Auto-criar mensalidades para cursos multi-mês (Modulos > 1) =====
-        // Lógica: o pagamento é mensal. O mês 1 vence no dia 5 do mês da matrícula
-        // e os meses seguintes vencem no dia 5 de cada mês subsequente, até fechar
-        // o ciclo de X meses. Cada mensalidade tem prazo de 1 mês (até dia 5 do
-        // mês seguinte); a partir do dia 6 do mês seguinte é considerada dívida.
+        // ===== Auto-criar mensalidades para cursos com paga_mensal = 'sim' =====
+        // Lógica: o pagamento é mensal. O valor de cada mensalidade é o
+        // Valor_curso (pagamento mensal). O mês 1 vence no dia 5 do mês de
+        // referência e os meses seguintes vencem no dia 5 de cada mês
+        // subsequente, até fechar o ciclo de X meses. Cada mensalidade tem prazo
+        // de 1 mês (até dia 5 do mês seguinte); a partir do dia 6 do mês
+        // seguinte é considerada dívida. O mês de referência inicial é o mês de
+        // início da turma quando disponível, senão o mês da matrícula.
         var mensalidadesCriadas = 0;
         try {
             var cursoInfo = await Cursos.findOne({ where: { Nome: newMatricula.Curso } });
             if (cursoInfo && parseInt(cursoInfo.Modulos) > 1 && cursoInfo.paga_mensal === 'sim') {
                 var modulos = parseInt(cursoInfo.Modulos);
-                var valorMensal = (parseFloat(cursoInfo.Valor_curso) || 0) / modulos;
+                var valorMensal = parseFloat(cursoInfo.Valor_curso) || 0;
                 if (valorMensal > 0) {
-                    var dataMat = new Date(newMatricula.Data_Matricula);
+                    var turmaInfo = newMatricula.Turma ? await Turmas.findOne({ where: { Turma: newMatricula.Turma } }) : null;
+                    var dataRef = turmaInfo && turmaInfo.Data_INIC ? new Date(turmaInfo.Data_INIC) : new Date(newMatricula.Data_Matricula);
+                    if (isNaN(dataRef.getTime())) dataRef = new Date(newMatricula.Data_Matricula);
                     for (var k = 1; k <= modulos; k++) {
-                        var vencimento;
-                        if (k === 1) {
-                            vencimento = new Date(dataMat.getFullYear(), dataMat.getMonth(), 5);
-                        } else {
-                            vencimento = new Date(dataMat.getFullYear(), dataMat.getMonth() + (k - 1), 5);
-                        }
+                        var vencimento = new Date(dataRef.getFullYear(), dataRef.getMonth() + (k - 1), 5);
                         var vencStr = vencimento.toISOString().split('T')[0];
                         var refMes = vencimento.getFullYear() + '-' + String(vencimento.getMonth() + 1).padStart(2, '0');
                         var mesNome = vencimento.toLocaleString('pt-PT', { month: 'long', year: 'numeric' });

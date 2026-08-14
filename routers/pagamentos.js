@@ -494,12 +494,14 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 // ========== DÍVIDAS POR CURSO ==========
 // Lista os formandos ADMITIDOS/ATIVO cujas turmas estão activas e cujo curso
 // tem paga_mensal = 'sim'. Calcula as mensalidades em aberto dinamicamente:
-// - O valor de cada mês é Valor_curso / Modulos (pagamento mensal)
-// - Os meses de referência vão da data de matrícula até ao mês corrente,
-//   limitados ao número de modulos (meses) do curso.
+// - O valor de cada mensalidade é o Valor_curso do curso (pagamento mensal).
+// - Os meses de referência vão do início da formação (data de início da turma
+//   activa ou, na falta, data de matrícula) até ao mês corrente, limitados ao
+//   número de modulos (meses) do curso.
 // - O vencimento de cada mensalidade é no dia 5 do mês de referência, com
-//   prazo de pagamento de 1 mês (até dia 5 do mês seguinte). A partir do
-//   dia 6 do mês seguinte, a mensalidade não paga é considerada dívida.
+//   prazo de 1 mês (até dia 5 do mês seguinte). A partir do dia 6 do mês
+//   seguinte, a mensalidade não paga é considerada dívida.
+// - Cada pagamento cobre apenas UM mês (o mês da data de pagamento).
 router_pagamentos.get("/dividas", async (req, res) => {
     try {
         var hoje = new Date();
@@ -507,12 +509,14 @@ router_pagamentos.get("/dividas", async (req, res) => {
         var mesAtual = hoje.getMonth() + 1;
         var anoAtual = hoje.getFullYear();
 
-        // Turmas activas
+        // Turmas activas (nome + data de início, usada como início da formação)
         var turmasAtivas = await Turmas.findAll({
             where: { Status: 'Ativa' },
-            attributes: ['Turma']
+            attributes: ['Turma', 'Data_INIC']
         });
         var nomesTurmasAtivas = turmasAtivas.map(function (t) { return t.Turma; });
+        var turmaInfo = {};
+        turmasAtivas.forEach(function (t) { turmaInfo[t.Turma] = t.Data_INIC; });
 
         // Cursos com paga_mensal = 'sim'
         var cursos = await Cursos.findAll({
@@ -540,21 +544,21 @@ router_pagamentos.get("/dividas", async (req, res) => {
             where: whereMatriculas
         });
 
-        // Apenas formandos em cursos multi-mês (Modulos > 1) com paga_mensal = 'sim'
+        // Apenas formandos em cursos com paga_mensal = 'sim'
         var matriculasComMensalidade = matriculas.filter(function (m) {
-            var info = cursoInfo[m.Curso];
-            return info && info.Modulos > 1;
+            return cursoInfo[m.Curso];
         });
 
         var dividas = await Promise.all(matriculasComMensalidade.map(async function (m) {
             var info = cursoInfo[m.Curso];
             var modulos = info ? info.Modulos : 1;
-            var valorMensal = (parseFloat(info.Valor_curso) || 0) / modulos;
+            var valorMensal = parseFloat(info.Valor_curso) || 0;
 
-            // Meses de referência: do mês da matrícula até ao mês corrente (inclusive),
-            // limitado ao número de modulos (meses) do curso
+            // Meses de referência: do início da formação (início da turma activa,
+            // ou data de matrícula como alternativa) até ao mês corrente
+            // (inclusive), limitado ao número de modulos (meses) do curso
             var mesesRefs = [];
-            var dataInicio = m.Data_Matricula ? new Date(m.Data_Matricula) : new Date();
+            var dataInicio = turmaInfo[m.Turma] ? new Date(turmaInfo[m.Turma]) : (m.Data_Matricula ? new Date(m.Data_Matricula) : new Date());
             if (isNaN(dataInicio.getTime())) dataInicio = new Date();
             var cy = dataInicio.getFullYear();
             var cm = dataInicio.getMonth() + 1;
@@ -577,28 +581,25 @@ router_pagamentos.get("/dividas", async (req, res) => {
             });
             var mesesPagos = {};
             pagamentos.forEach(function (p) {
-                var fontePago = p.data_pagamento;
-                var fonteVenc = p.data_vencimento;
-                if (fontePago) {
-                    var dp = new Date(fontePago);
-                    if (!isNaN(dp.getTime())) {
-                        mesesPagos[dp.getFullYear() + '-' + String(dp.getMonth() + 1).padStart(2, '0')] = true;
-                    }
-                }
-                if (p.status === 'pago' && fonteVenc) {
-                    var dv = new Date(fonteVenc);
-                    if (!isNaN(dv.getTime())) {
-                        mesesPagos[dv.getFullYear() + '-' + String(dv.getMonth() + 1).padStart(2, '0')] = true;
+                // Cada pagamento cobre UM mês: o mês da data de pagamento.
+                // Se não existir data de pagamento, usa o mês do vencimento.
+                var fonte = p.data_pagamento || (p.status === 'pago' ? p.data_vencimento : null);
+                if (fonte) {
+                    var dt = new Date(fonte);
+                    if (!isNaN(dt.getTime())) {
+                        mesesPagos[dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0')] = true;
                     }
                 }
             });
 
             // Dívida = meses de referência sem pagamento
-            // Prazo de 1 mês: a mensalidade do mês X vence a 5/X e pode ser paga
-            // até 5/X+1. A partir do dia 6 do mês seguinte passa a ser dívida.
+            // Vencimento no dia 5 do mês de referência, prazo de 1 mês (até dia 5
+            // do mês seguinte). A partir do dia 6 do mês seguinte, a mensalidade
+            // não paga é considerada dívida.
             var meses = mesesRefs.map(function (ref) {
-                var venc = new Date(ref.y, ref.m - 1, 1);
+                var venc = new Date(ref.y, ref.m - 1, 5);
                 var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
+                var dataVencStr = refKey + '-05';
                 var pago = !!mesesPagos[refKey];
 
                 var seguinteAno = ref.m === 12 ? ref.y + 1 : ref.y;
@@ -614,7 +615,7 @@ router_pagamentos.get("/dividas", async (req, res) => {
                 return {
                     ref_mes: refKey,
                     label: venc.toLocaleString('pt-PT', { month: 'long', year: 'numeric' }),
-                    data_vencimento: venc.toISOString().split('T')[0],
+                    data_vencimento: dataVencStr,
                     valor: valorMensal,
                     status: pago ? 'pago' : (vencida ? 'vencida' : 'pendente'),
                     pago: pago,
