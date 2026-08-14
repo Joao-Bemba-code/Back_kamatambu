@@ -497,8 +497,9 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 // - O valor de cada mês é Valor_curso / Modulos (pagamento mensal)
 // - Os meses de referência vão da data de matrícula até ao mês corrente,
 //   limitados ao número de modulos (meses) do curso.
-// - O prazo para cada mensalidade é do dia 1 ao dia 5; a partir do dia 6
-//   do mês, a mensalidade não paga passa a ser considerada dívida.
+// - O vencimento de cada mensalidade é no dia 5 do mês de referência, com
+//   prazo de pagamento de 1 mês (até dia 5 do mês seguinte). A partir do
+//   dia 6 do mês seguinte, a mensalidade não paga é considerada dívida.
 router_pagamentos.get("/dividas", async (req, res) => {
     try {
         var hoje = new Date();
@@ -593,15 +594,20 @@ router_pagamentos.get("/dividas", async (req, res) => {
             });
 
             // Dívida = meses de referência sem pagamento
-            // O mês corrente só conta como dívida a partir do dia 6
+            // Prazo de 1 mês: a mensalidade do mês X vence a 5/X e pode ser paga
+            // até 5/X+1. A partir do dia 6 do mês seguinte passa a ser dívida.
             var meses = mesesRefs.map(function (ref) {
                 var venc = new Date(ref.y, ref.m - 1, 1);
                 var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
                 var pago = !!mesesPagos[refKey];
 
-                var eMesCorrente = (ref.y === anoAtual && ref.m === mesAtual);
+                var seguinteAno = ref.m === 12 ? ref.y + 1 : ref.y;
+                var seguinteMes = ref.m === 12 ? 1 : ref.m + 1;
+                var passouPrazo = seguinteAno < anoAtual ||
+                    (seguinteAno === anoAtual && (seguinteMes < mesAtual || (seguinteMes === mesAtual && diaAtual >= 6)));
+
                 var vencida = !pago;
-                if (eMesCorrente && diaAtual <= 5 && !pago) {
+                if (!pago && !passouPrazo) {
                     vencida = false;
                 }
 

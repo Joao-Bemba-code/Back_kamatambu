@@ -27,7 +27,7 @@ function formatarValorMonetario(valor) {
 router_cursos.get("/lista", async (req, res) => {
     try {
         const cursos = await Cursos.findAll({
-            attributes: ['id', 'Nome', 'Valor_curso'],
+            attributes: ['id', 'Nome', 'Valor_curso', 'Modulos', 'paga_mensal'],
             order: [['Nome', 'ASC']]
         });
 
@@ -100,7 +100,8 @@ router_cursos.post("/", async (req, res) => {
             Duracao,
             Carga_Horaria,
             Valor_curso,
-            Status
+            Status,
+            paga_mensal
         } = req.body;
 
         if (!Nome) {
@@ -147,6 +148,14 @@ router_cursos.post("/", async (req, res) => {
             });
         }
 
+        const pagaMensalValidos = ['sim', 'nao'];
+        if (paga_mensal && !pagaMensalValidos.includes(paga_mensal)) {
+            return res.status(400).json({
+                success: false,
+                message: "paga_mensal inválido. Use: sim ou nao"
+            });
+        }
+
         const valorCursoFormatado = Valor_curso ? formatarValorMonetario(Valor_curso) : "0.00";
 
         const newCurso = await Cursos.create({
@@ -158,7 +167,8 @@ router_cursos.post("/", async (req, res) => {
             Duracao: Duracao || null,
             Carga_Horaria: Carga_Horaria ? parseInt(Carga_Horaria) : null,
             Valor_curso: valorCursoFormatado,
-            Status: Status || 'Ativo'
+            Status: Status || 'Ativo',
+            paga_mensal: paga_mensal || 'nao'
         });
 
         return res.status(201).json({
@@ -188,7 +198,8 @@ router_cursos.put("/:id", async (req, res) => {
             Duracao,
             Carga_Horaria,
             Valor_curso,
-            Status
+            Status,
+            paga_mensal
         } = req.body;
 
         const curso = await Cursos.findByPk(id);
@@ -237,6 +248,14 @@ router_cursos.put("/:id", async (req, res) => {
             });
         }
 
+        const pagaMensalValidos = ['sim', 'nao'];
+        if (paga_mensal !== undefined && !pagaMensalValidos.includes(paga_mensal)) {
+            return res.status(400).json({
+                success: false,
+                message: "paga_mensal inválido. Use: sim ou nao"
+            });
+        }
+
         const valorCursoFormatado = Valor_curso !== undefined && Valor_curso !== null 
             ? formatarValorMonetario(Valor_curso) 
             : curso.Valor_curso;
@@ -250,7 +269,8 @@ router_cursos.put("/:id", async (req, res) => {
             Duracao: Duracao !== undefined ? Duracao : curso.Duracao,
             Carga_Horaria: Carga_Horaria !== undefined ? parseInt(Carga_Horaria) : curso.Carga_Horaria,
             Valor_curso: valorCursoFormatado,
-            Status: Status || curso.Status
+            Status: Status || curso.Status,
+            paga_mensal: paga_mensal !== undefined ? paga_mensal : curso.paga_mensal
         });
 
         return res.status(200).json({

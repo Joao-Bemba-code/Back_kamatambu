@@ -113,9 +113,10 @@ router_matriculas.post("/", async (req, res) => {
         });
 
         // ===== Auto-criar mensalidades para cursos multi-mês (Modulos > 1) =====
-        // Lógica: o pagamento é mensal. O mês 1 vence na data da matrícula e os
-        // meses seguintes vencem no dia 1 de cada mês subsequente, até fechar o
-        // ciclo de X meses. A dívida é sempre que o mês não foi pago.
+        // Lógica: o pagamento é mensal. O mês 1 vence no dia 5 do mês da matrícula
+        // e os meses seguintes vencem no dia 5 de cada mês subsequente, até fechar
+        // o ciclo de X meses. Cada mensalidade tem prazo de 1 mês (até dia 5 do
+        // mês seguinte); a partir do dia 6 do mês seguinte é considerada dívida.
         var mensalidadesCriadas = 0;
         try {
             var cursoInfo = await Cursos.findOne({ where: { Nome: newMatricula.Curso } });
