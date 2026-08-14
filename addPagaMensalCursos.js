@@ -28,7 +28,7 @@ async function addPagaMensalCursos() {
     }
 
     await conn.execute(`
-        UPDATE \`Cursos\` SET \`paga_mensal\` = 'sim' WHERE LOWER(\`Nome\`) = 'english'
+        UPDATE \`Cursos\` SET \`paga_mensal\` = 'sim' WHERE LOWER(\`Nome\`) IN ('english', 'inglês')
     `);
     console.log("Curso 'english' definido com paga_mensal = 'sim'.");
 
