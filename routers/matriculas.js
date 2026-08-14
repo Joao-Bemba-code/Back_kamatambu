@@ -3,14 +3,6 @@ const router_matriculas = express.Router();
 const { Sequelize } = require("../config/index.js");
 const { Matriculas, Formadores, Turmas, Pagamentos, Cursos } = require("../models/index.js");
 
-// ===== Limite inicial: só o curso "English" gera dívida de mensalidade =====
-var CURSOS_COM_MENSALIDADES = ['english'];
-var isCursoComMensalidade = function (nome) {
-    if (!nome) return false;
-    var n = String(nome).toLowerCase();
-    return CURSOS_COM_MENSALIDADES.some(function (c) { return n === c; });
-};
-
 async function obterTurmasDoFormador(req) {
     var formador = null;
     if (req.user.formador_id) {
@@ -127,17 +119,17 @@ router_matriculas.post("/", async (req, res) => {
         var mensalidadesCriadas = 0;
         try {
             var cursoInfo = await Cursos.findOne({ where: { Nome: newMatricula.Curso } });
-            if (cursoInfo && parseInt(cursoInfo.Modulos) > 1 && isCursoComMensalidade(cursoInfo.Nome)) {
+            if (cursoInfo && parseInt(cursoInfo.Modulos) > 1 && cursoInfo.paga_mensal === 'sim') {
                 var modulos = parseInt(cursoInfo.Modulos);
-                var valorMensal = parseFloat(cursoInfo.Valor_curso) || 0;
+                var valorMensal = (parseFloat(cursoInfo.Valor_curso) || 0) / modulos;
                 if (valorMensal > 0) {
                     var dataMat = new Date(newMatricula.Data_Matricula);
                     for (var k = 1; k <= modulos; k++) {
                         var vencimento;
                         if (k === 1) {
-                            vencimento = new Date(dataMat);
+                            vencimento = new Date(dataMat.getFullYear(), dataMat.getMonth(), 5);
                         } else {
-                            vencimento = new Date(dataMat.getFullYear(), dataMat.getMonth() + (k - 1), 1);
+                            vencimento = new Date(dataMat.getFullYear(), dataMat.getMonth() + (k - 1), 5);
                         }
                         var vencStr = vencimento.toISOString().split('T')[0];
                         var refMes = vencimento.getFullYear() + '-' + String(vencimento.getMonth() + 1).padStart(2, '0');

@@ -59,6 +59,11 @@ const Cursos = sequelize.define("Cursos", {
         type: Sequelize.ENUM("Ativo", "Inativo", "Em desenvolvimento"),
         defaultValue: "Ativo",
         allowNull: false
+    },
+    paga_mensal: {
+        type: Sequelize.ENUM("sim", "nao"),
+        allowNull: false,
+        defaultValue: "nao"
     }
 }, {
     timestamps: true,

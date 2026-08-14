@@ -1,17 +1,9 @@
 // routers/pagamentos.js
 const express = require("express");
 const router_pagamentos = express.Router();
-const { Pagamentos, Matriculas, Saidas, Cursos } = require("../models/index.js");
+const { Pagamentos, Matriculas, Saidas, Cursos, Turmas } = require("../models/index.js");
 const { Op } = require("sequelize");
 const { sequelize } = require("../config/index.js");
-
-// ===== Limite inicial: só o curso "English" gera/conta como dívida de mensalidade =====
-var CURSOS_COM_MENSALIDADES = ['english'];
-var isCursoComMensalidade = function (nome) {
-    if (!nome) return false;
-    var n = String(nome).toLowerCase();
-    return CURSOS_COM_MENSALIDADES.some(function (c) { return n === c; });
-};
 
 // ========== LISTAR TODOS OS PAGAMENTOS ==========
 router_pagamentos.get("/", async (req, res) => {
@@ -500,51 +492,72 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 });
 
 // ========== DÍVIDAS POR CURSO ==========
-// Lista os formandos ADMITIDOS/ATIVO no curso English (multi-mês) e calcula as
-// mensalidades em aberto dinamicamente: gera os meses de referência desde a data
-// de matrícula até ao mês corrente e considera um mês como dívida quando não há
-// nenhum registo de pagamento (data_pagamento ou pagamento com data_vencimento
-// no mês) associado a esse formando.
+// Lista os formandos ADMITIDOS/ATIVO cujas turmas estão activas e cujo curso
+// tem paga_mensal = 'sim'. Calcula as mensalidades em aberto dinamicamente:
+// - O valor de cada mês é Valor_curso / Modulos (pagamento mensal)
+// - Os meses de referência vão da data de matrícula até ao mês corrente,
+//   limitados ao número de modulos (meses) do curso.
+// - O prazo para cada mensalidade é do dia 1 ao dia 5; a partir do dia 6
+//   do mês, a mensalidade não paga passa a ser considerada dívida.
 router_pagamentos.get("/dividas", async (req, res) => {
     try {
         var hoje = new Date();
+        var diaAtual = hoje.getDate();
         var mesAtual = hoje.getMonth() + 1;
         var anoAtual = hoje.getFullYear();
 
-        // Matrículas admitidas/ativo (formandos em curso activo)
-        var matriculas = await Matriculas.findAll({
-            where: { Status: ['Admitido', 'Ativo'] }
+        // Turmas activas
+        var turmasAtivas = await Turmas.findAll({
+            where: { Status: 'Ativa' },
+            attributes: ['Turma']
         });
+        var nomesTurmasAtivas = turmasAtivas.map(function (t) { return t.Turma; });
 
-        // Mapeia cursos: Nome -> { Modulos, Valor_curso }
+        // Cursos com paga_mensal = 'sim'
         var cursos = await Cursos.findAll({
+            where: { paga_mensal: 'sim' },
             attributes: ['Nome', 'Modulos', 'Valor_curso']
         });
-        var cursoModulos = {};
+        var cursoInfo = {};
         cursos.forEach(function (c) {
-            cursoModulos[c.Nome] = {
+            cursoInfo[c.Nome] = {
                 Modulos: parseInt(c.Modulos) || 1,
                 Valor_curso: c.Valor_curso
             };
         });
 
-        // Apenas formandos em cursos multi-mês (Modulos > 1)
-        var matriculasMultiMes = matriculas.filter(function (m) {
-            var info = cursoModulos[m.Curso];
-            return info && info.Modulos > 1 && isCursoComMensalidade(m.Curso);
+        // Matrículas admitidas/ativo cujas turmas estão activas
+        var whereMatriculas = {
+            Status: ['Admitido', 'Ativo']
+        };
+        if (nomesTurmasAtivas.length > 0) {
+            whereMatriculas.Turma = { [Op.in]: nomesTurmasAtivas };
+        } else {
+            whereMatriculas.Turma = null;
+        }
+        var matriculas = await Matriculas.findAll({
+            where: whereMatriculas
         });
 
-        var dividas = await Promise.all(matriculasMultiMes.map(async function (m) {
-            var info = cursoModulos[m.Curso];
-            var valorMensal = parseFloat(info.Valor_curso) || 0;
+        // Apenas formandos em cursos multi-mês (Modulos > 1) com paga_mensal = 'sim'
+        var matriculasComMensalidade = matriculas.filter(function (m) {
+            var info = cursoInfo[m.Curso];
+            return info && info.Modulos > 1;
+        });
 
-            // Meses de referência: do mês da matrícula até ao mês corrente (inclusive)
+        var dividas = await Promise.all(matriculasComMensalidade.map(async function (m) {
+            var info = cursoInfo[m.Curso];
+            var modulos = info ? info.Modulos : 1;
+            var valorMensal = (parseFloat(info.Valor_curso) || 0) / modulos;
+
+            // Meses de referência: do mês da matrícula até ao mês corrente (inclusive),
+            // limitado ao número de modulos (meses) do curso
             var mesesRefs = [];
             var dataInicio = m.Data_Matricula ? new Date(m.Data_Matricula) : new Date();
             if (isNaN(dataInicio.getTime())) dataInicio = new Date();
             var cy = dataInicio.getFullYear();
             var cm = dataInicio.getMonth() + 1;
-            while (cy < anoAtual || (cy === anoAtual && cm <= mesAtual)) {
+            while ((cy < anoAtual || (cy === anoAtual && cm <= mesAtual)) && mesesRefs.length < modulos) {
                 mesesRefs.push({ y: cy, m: cm });
                 cm++;
                 if (cm > 12) { cm = 1; cy++; }
@@ -580,21 +593,29 @@ router_pagamentos.get("/dividas", async (req, res) => {
             });
 
             // Dívida = meses de referência sem pagamento
+            // O mês corrente só conta como dívida a partir do dia 6
             var meses = mesesRefs.map(function (ref) {
                 var venc = new Date(ref.y, ref.m - 1, 1);
                 var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
                 var pago = !!mesesPagos[refKey];
+
+                var eMesCorrente = (ref.y === anoAtual && ref.m === mesAtual);
+                var vencida = !pago;
+                if (eMesCorrente && diaAtual <= 5 && !pago) {
+                    vencida = false;
+                }
+
                 return {
                     ref_mes: refKey,
                     label: venc.toLocaleString('pt-PT', { month: 'long', year: 'numeric' }),
                     data_vencimento: venc.toISOString().split('T')[0],
                     valor: valorMensal,
-                    status: pago ? 'pago' : 'pendente',
+                    status: pago ? 'pago' : (vencida ? 'vencida' : 'pendente'),
                     pago: pago,
-                    vencida: !pago,
+                    vencida: vencida,
                     id: null
                 };
-            }).filter(function (mm) { return !mm.pago; });
+            }).filter(function (mm) { return !mm.pago && mm.vencida; });
 
             if (!meses || meses.length === 0) return null;
 
@@ -607,7 +628,7 @@ router_pagamentos.get("/dividas", async (req, res) => {
                 curso: m.Curso,
                 turma: m.Turma,
                 telefone: m.Telefone,
-                modulos_curso: info ? info.Modulos : 0,
+                modulos_curso: modulos,
                 total_meses_devidos: meses.length,
                 total_divida: parseFloat(totalDivida.toFixed(2)),
                 meses: meses,
