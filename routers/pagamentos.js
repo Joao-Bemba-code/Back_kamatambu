@@ -500,7 +500,11 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 //   número de modulos (meses) do curso.
 // - O vencimento de cada mensalidade é no dia 5 do mês de referência; a
 //   partir do dia 6 do próprio mês, a mensalidade não paga é considerada dívida.
+// - Acréscimo de ACRESCIMO_ATRASO (Kz) na mensalidade não paga até ao dia 15
+//   do mês de referência.
 // - Cada pagamento cobre apenas UM mês (o mês da data de pagamento).
+// - total_meses_divida = meses distintos em dívida (não meses x alunos).
+var ACRESCIMO_ATRASO = 3000;
 router_pagamentos.get("/dividas", async (req, res) => {
     try {
         var hoje = new Date();
@@ -594,6 +598,7 @@ router_pagamentos.get("/dividas", async (req, res) => {
             // Dívida = meses de referência sem pagamento
             // Vencimento no dia 5 do mês de referência; a partir do dia 6 do
             // próprio mês, a mensalidade não paga é considerada dívida.
+            // Acréscimo de ACRESCIMO_ATRASO se não paga até ao dia 15.
             var meses = mesesRefs.map(function (ref) {
                 var venc = new Date(ref.y, ref.m - 1, 5);
                 var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
@@ -602,14 +607,20 @@ router_pagamentos.get("/dividas", async (req, res) => {
 
                 var passouDia6 = (ref.y < anoAtual) ||
                     (ref.y === anoAtual && (ref.m < mesAtual || (ref.m === mesAtual && diaAtual >= 6)));
+                var passouDia15 = (ref.y < anoAtual) ||
+                    (ref.y === anoAtual && (ref.m < mesAtual || (ref.m === mesAtual && diaAtual >= 16)));
 
                 var vencida = !pago && passouDia6;
+                var acrescimo = (!pago && passouDia15) ? ACRESCIMO_ATRASO : 0;
+                var valorMes = valorMensal + acrescimo;
 
                 return {
                     ref_mes: refKey,
                     label: venc.toLocaleString('pt-PT', { month: 'long', year: 'numeric' }),
                     data_vencimento: dataVencStr,
-                    valor: valorMensal,
+                    valor: valorMes,
+                    valor_base: valorMensal,
+                    acrescimo: acrescimo,
                     status: pago ? 'pago' : (vencida ? 'vencida' : 'pendente'),
                     pago: pago,
                     vencida: vencida,
@@ -619,7 +630,7 @@ router_pagamentos.get("/dividas", async (req, res) => {
 
             if (!meses || meses.length === 0) return null;
 
-            var totalDivida = meses.length * valorMensal;
+            var totalDivida = meses.reduce(function (s, mm) { return s + mm.valor; }, 0);
 
             return {
                 id: m.id,
@@ -639,7 +650,11 @@ router_pagamentos.get("/dividas", async (req, res) => {
         var data = dividas.filter(Boolean);
 
         var totalDevedores = data.length;
-        var totalMesesDivida = data.reduce(function (s, d) { return s + d.total_meses_devidos; }, 0);
+        var mesesSet = {};
+        data.forEach(function (d) {
+            (d.meses || []).forEach(function (m) { mesesSet[m.ref_mes] = true; });
+        });
+        var totalMesesDivida = Object.keys(mesesSet).length;
         var totalValorDivida = data.reduce(function (s, d) { return s + d.total_divida; }, 0);
 
         return res.status(200).json({
