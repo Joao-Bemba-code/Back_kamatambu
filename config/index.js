@@ -1,18 +1,19 @@
 var dotenv = require('dotenv');
 dotenv.config({path:'../.env'});
 
-var {Name_database, User_database, Pass_database, Host_database, Lang_database, Port} = process.env;
+var {Name_database, User_database, Pass_database, Host_database, Lang_database, Port, CA_path} = process.env;
 
 var Sequelize = require('sequelize');
 
 var sequelize = new Sequelize(Name_database, User_database, Pass_database, {
     host: Host_database,
     dialect: Lang_database,
-    port: 4054,
+    port: Port ? parseInt(Port) : 4000,
     dialectOptions: {
         ssl: {
             require: true,
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
+            ...(CA_path && CA_path !== '<CA_PATH>' ? { ca: CA_path } : {})
         }
     },
     connectTimeout: 60000,
