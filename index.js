@@ -16,6 +16,8 @@ const statsRoutes = require("./routers/stats.js");
 var academicoRoutes = require("./routers/academico.js");
 var criteriosRoutes = require("./routers/criteriosAvaliacao.js");
 var saidasRoutes = require("./routers/saidas.js");
+var salasRoutes = require("./routers/salas.js");
+var alugueresRoutes = require("./routers/alugueres.js");
 var uploadRouter = require("./routers/upload.js");
 
 var app = express();
@@ -46,6 +48,8 @@ app.use("/api/stats", authenticate, statsRoutes);
 app.use("/api/academico", authenticate, academicoRoutes);
 app.use("/api/criterios-avaliacao", authenticate, criteriosRoutes);
 app.use("/api/saidas", authenticate, saidasRoutes);
+app.use("/api/salas", authenticate, salasRoutes);
+app.use("/api/alugueres", authenticate, alugueresRoutes);
 app.use("/api/upload", authenticate, uploadRouter);
 
 // Rotas protegidas sem prefixo /api (compatibilidade com frontend)
@@ -58,6 +62,8 @@ app.use("/stats", authenticate, statsRoutes);
 app.use("/academico", authenticate, academicoRoutes);
 app.use("/criterios-avaliacao", authenticate, criteriosRoutes);
 app.use("/saidas", authenticate, saidasRoutes);
+app.use("/salas", authenticate, salasRoutes);
+app.use("/alugueres", authenticate, alugueresRoutes);
 app.use("/upload", authenticate, uploadRouter);
 
 // Rotas publicas
