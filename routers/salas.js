@@ -67,7 +67,7 @@ router_salas.get("/:id", async (req, res) => {
 // ========== POST - Criar nova sala ==========
 router_salas.post("/", async (req, res) => {
     try {
-        var { Nome, Capacidade, Localizacao, Status } = req.body;
+        var { Nome, Capacidade, Localizacao, Status, Preco_Hora, Preco_Dia } = req.body;
 
         if (!Nome) {
             return res.status(400).json({
@@ -80,6 +80,8 @@ router_salas.post("/", async (req, res) => {
             Nome: Nome.trim(),
             Capacidade: Capacidade || 20,
             Localizacao: Localizacao || null,
+            Preco_Hora: Preco_Hora !== undefined && Preco_Hora !== '' ? parseFloat(Preco_Hora) : 0,
+            Preco_Dia: Preco_Dia !== undefined && Preco_Dia !== '' ? parseFloat(Preco_Dia) : 0,
             Status: Status || 'Disponível'
         });
 
@@ -101,7 +103,7 @@ router_salas.post("/", async (req, res) => {
 router_salas.put("/:id", async (req, res) => {
     try {
         var { id } = req.params;
-        var { Nome, Capacidade, Localizacao, Status } = req.body;
+        var { Nome, Capacidade, Localizacao, Status, Preco_Hora, Preco_Dia } = req.body;
 
         var sala = await Salas.findByPk(id);
 
@@ -116,6 +118,8 @@ router_salas.put("/:id", async (req, res) => {
             Nome: Nome ? Nome.trim() : sala.Nome,
             Capacidade: Capacidade || sala.Capacidade,
             Localizacao: Localizacao !== undefined ? Localizacao : sala.Localizacao,
+            Preco_Hora: Preco_Hora !== undefined && Preco_Hora !== '' ? parseFloat(Preco_Hora) : sala.Preco_Hora,
+            Preco_Dia: Preco_Dia !== undefined && Preco_Dia !== '' ? parseFloat(Preco_Dia) : sala.Preco_Dia,
             Status: Status || sala.Status
         });
 

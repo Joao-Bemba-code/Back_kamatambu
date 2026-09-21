@@ -25,6 +25,22 @@ const Salas = sequelize.define("Salas", {
         type: Sequelize.STRING(100),
         allowNull: true
     },
+    Preco_Hora: {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+        validate: {
+            min: 0
+        }
+    },
+    Preco_Dia: {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+        validate: {
+            min: 0
+        }
+    },
     Status: {
         type: Sequelize.ENUM("Disponível", "Ocupada", "Em manutenção"),
         defaultValue: "Disponível",

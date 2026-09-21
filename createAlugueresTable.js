@@ -24,6 +24,8 @@ async function createAlugueresTable() {
                 \`Data_Inicio\` DATE NOT NULL,
                 \`Data_Fim\` DATE NOT NULL,
                 \`Valor\` DECIMAL(10,2) NOT NULL,
+                \`Tipo_Cobranca\` ENUM('hora','dia') NOT NULL DEFAULT 'dia',
+                \`Duracao\` DECIMAL(10,2) NOT NULL DEFAULT 1,
                 \`Status\` ENUM('pago','pendente','parcial','cancelado') NOT NULL DEFAULT 'pendente',
                 \`Forma_Pagamento\` ENUM('dinheiro','transferencia','deposito','multicaixa') NOT NULL DEFAULT 'dinheiro',
                 \`Observacao\` TEXT,

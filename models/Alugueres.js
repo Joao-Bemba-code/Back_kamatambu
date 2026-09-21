@@ -49,6 +49,19 @@ const Alugueres = sequelize.define("Alugueres", {
             min: 0
         }
     },
+    Tipo_Cobranca: {
+        type: Sequelize.ENUM("hora", "dia"),
+        defaultValue: "dia",
+        allowNull: false
+    },
+    Duracao: {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 1,
+        validate: {
+            min: 0.01
+        }
+    },
     Status: {
         type: Sequelize.ENUM("pago", "pendente", "parcial", "cancelado"),
         defaultValue: "pendente",

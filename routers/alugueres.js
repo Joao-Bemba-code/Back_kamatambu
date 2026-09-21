@@ -62,7 +62,9 @@ router_alugueres.post("/", async (req, res) => {
             Valor,
             Status,
             Forma_Pagamento,
-            Observacao
+            Observacao,
+            Tipo_Cobranca,
+            Duracao
         } = req.body;
 
         if (!Sala) {
@@ -79,10 +81,25 @@ router_alugueres.post("/", async (req, res) => {
             });
         }
 
-        if (!Valor || parseFloat(Valor) <= 0) {
+        var tipoCobranca = Tipo_Cobranca === 'hora' ? 'hora' : 'dia';
+        var duracaoVal = (Duracao !== undefined && Duracao !== '' && parseFloat(Duracao) > 0) ? parseFloat(Duracao) : 1;
+        var valorFinal = null;
+
+        if (sala_id) {
+            var sala = await Salas.findByPk(sala_id);
+            if (sala) {
+                await sala.update({ Status: 'Ocupada' });
+                var precoBase = tipoCobranca === 'hora' ? parseFloat(sala.Preco_Hora || 0) : parseFloat(sala.Preco_Dia || 0);
+                valorFinal = precoBase * duracaoVal;
+            }
+        }
+
+        var valorUsado = (Valor !== undefined && Valor !== '' && parseFloat(Valor) > 0) ? parseFloat(Valor) : valorFinal;
+
+        if (valorUsado === null || valorUsado <= 0) {
             return res.status(400).json({
                 success: false,
-                message: "O valor deve ser maior que zero"
+                message: "O valor deve ser maior que zero (defina o preço por hora/dia na sala ou informe um valor)"
             });
         }
 
@@ -93,13 +110,6 @@ router_alugueres.post("/", async (req, res) => {
             });
         }
 
-        if (sala_id) {
-            var sala = await Salas.findByPk(sala_id);
-            if (sala) {
-                await sala.update({ Status: 'Ocupada' });
-            }
-        }
-
         var newAluguer = await Alugueres.create({
             sala_id: sala_id || null,
             Sala: Sala.trim(),
@@ -107,7 +117,9 @@ router_alugueres.post("/", async (req, res) => {
             Telefone: Telefone || null,
             Data_Inicio: Data_Inicio,
             Data_Fim: Data_Fim,
-            Valor: parseFloat(Valor),
+            Valor: valorUsado,
+            Tipo_Cobranca: tipoCobranca,
+            Duracao: duracaoVal,
             Status: Status || 'pendente',
             Forma_Pagamento: Forma_Pagamento || 'dinheiro',
             Observacao: Observacao || null,
@@ -142,7 +154,9 @@ router_alugueres.put("/:id", async (req, res) => {
             Valor,
             Status,
             Forma_Pagamento,
-            Observacao
+            Observacao,
+            Tipo_Cobranca,
+            Duracao
         } = req.body;
 
         var aluguer = await Alugueres.findByPk(id);
@@ -161,10 +175,30 @@ router_alugueres.put("/:id", async (req, res) => {
             });
         }
 
-        if (sala_id && sala_id !== aluguer.sala_id) {
-            var sala = await Salas.findByPk(sala_id);
-            if (sala) {
-                await sala.update({ Status: 'Ocupada' });
+        var tipoCobrancaNovo = Tipo_Cobranca === 'hora' ? 'hora' : 'dia';
+        var duracaoNova = (Duracao !== undefined && Duracao !== '' && parseFloat(Duracao) > 0) ? parseFloat(Duracao) : parseFloat(aluguer.Duracao || 1);
+
+        var novoValor = (Valor !== undefined && Valor !== '' && parseFloat(Valor) > 0) ? parseFloat(Valor) : null;
+
+        if (sala_id && sala_id != aluguer.sala_id) {
+            var novaSala = await Salas.findByPk(sala_id);
+            if (novaSala) {
+                await novaSala.update({ Status: 'Ocupada' });
+                if (novoValor === null) {
+                    var precoBase = tipoCobrancaNovo === 'hora' ? parseFloat(novaSala.Preco_Hora || 0) : parseFloat(novaSala.Preco_Dia || 0);
+                    novoValor = precoBase * duracaoNova;
+                }
+            }
+        }
+
+        if (novoValor === null) {
+            novoValor = parseFloat(aluguer.Valor || 0);
+            if (tipoCobrancaNovo !== aluguer.Tipo_Cobranca || duracaoNova !== parseFloat(aluguer.Duracao || 1)) {
+                var salaAtual = aluguer.sala_id ? await Salas.findByPk(aluguer.sala_id) : null;
+                if (salaAtual) {
+                    var precoBaseAtual = tipoCobrancaNovo === 'hora' ? parseFloat(salaAtual.Preco_Hora || 0) : parseFloat(salaAtual.Preco_Dia || 0);
+                    novoValor = precoBaseAtual * duracaoNova;
+                }
             }
         }
 
@@ -175,7 +209,9 @@ router_alugueres.put("/:id", async (req, res) => {
             Telefone: Telefone !== undefined ? Telefone : aluguer.Telefone,
             Data_Inicio: Data_Inicio || aluguer.Data_Inicio,
             Data_Fim: Data_Fim || aluguer.Data_Fim,
-            Valor: Valor !== undefined ? parseFloat(Valor) : aluguer.Valor,
+            Valor: novoValor,
+            Tipo_Cobranca: tipoCobrancaNovo,
+            Duracao: duracaoNova,
             Status: Status || aluguer.Status,
             Forma_Pagamento: Forma_Pagamento || aluguer.Forma_Pagamento,
             Observacao: Observacao !== undefined ? Observacao : aluguer.Observacao

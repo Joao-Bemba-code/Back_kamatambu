@@ -20,6 +20,8 @@ async function createSalasTable() {
                 \`Nome\` VARCHAR(50) NOT NULL,
                 \`Capacidade\` INTEGER NOT NULL DEFAULT 20,
                 \`Localizacao\` VARCHAR(100),
+                \`Preco_Hora\` DECIMAL(10,2) NOT NULL DEFAULT 0,
+                \`Preco_Dia\` DECIMAL(10,2) NOT NULL DEFAULT 0,
                 \`Status\` ENUM('Disponível','Ocupada','Em manutenção') NOT NULL DEFAULT 'Disponível',
                 \`createdAt\` DATETIME NOT NULL,
                 \`updatedAt\` DATETIME NOT NULL,
