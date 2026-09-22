@@ -279,44 +279,81 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
         fimMes.setDate(0);
         const fimMesStr = fimMes.toISOString().split('T')[0];
 
-        const previsaoMes = await Pagamentos.sum('valor', {
-            where: {
-                tipo: { [Op.ne]: 'venda' },
-                status: ['pendente', 'parcial'],
-                data_vencimento: {
-                    [Op.between]: [inicioMesStr, fimMesStr]
-                }
-            }
-        });
-
+        // ===== PREVISÃO DO MÊS =====
+        // Soma apenas o que vence NESTE MÊS, considerando apenas turmas ATIVAS
+        // (exclui concluídas, canceladas e pendentes) e formandos Inscrito/Admitido/Ativo.
+        // - Cursos paga_mensal='sim': mensalidade do MÊS CORRENTE (Valor_curso)
+        //   dos formandos que ainda não pagaram esse mês.
+        // - Cursos paga_mensal='nao': pagamentos pendente/parcial com
+        //   vencimento neste mês (o que ainda devemos receber período).
         let previsaoMesCurso = 0;
         try {
-            const matriculasPorCurso = await Matriculas.findAll({
-                attributes: [
-                    'Curso',
-                    [sequelize.fn('COUNT', sequelize.col('Matriculas.id')), 'total']
-                ],
-                where: { Status: ['Inscrito', 'Admitido', 'Ativo'] },
-                group: ['Curso']
+            const turmasPrevisao = await Turmas.findAll({
+                where: { Status: 'Ativa' },
+                attributes: ['Turma']
             });
+            const nomesTurmasPrevisao = turmasPrevisao.map(t => t.Turma);
 
-            const cursoNomes = matriculasPorCurso.map(m => m.dataValues.Curso).filter(Boolean);
-            if (cursoNomes.length > 0) {
-                const cursos = await Cursos.findAll({
-                    where: { Nome: cursoNomes, Status: 'Ativo' }
-                });
-                const cursosMap = {};
-                cursos.forEach(c => { cursosMap[c.Nome] = parseFloat(c.Valor_curso) || 0; });
+            const whereMatriculas = {
+                Status: ['Inscrito', 'Admitido', 'Ativo']
+            };
+            if (nomesTurmasPrevisao.length > 0) {
+                whereMatriculas.Turma = { [Op.in]: nomesTurmasPrevisao };
+            } else {
+                whereMatriculas.Turma = null;
+            }
 
-                previsaoMesCurso = matriculasPorCurso.reduce((sum, item) => {
-                    const nomeCurso = item.dataValues.Curso;
-                    const qtd = parseInt(item.dataValues.total);
-                    const valor = cursosMap[nomeCurso] || 0;
-                    return sum + (qtd * valor);
-                }, 0);
+            const matriculasPrevisao = await Matriculas.findAll({ where: whereMatriculas });
+            const cursos = await Cursos.findAll({
+                where: { Status: 'Ativo' },
+                attributes: ['Nome', 'Valor_curso', 'paga_mensal']
+            });
+            const cursosMapPrev = {};
+            cursos.forEach(c => { cursosMapPrev[c.Nome] = c; });
+
+            for (const m of matriculasPrevisao) {
+                const curso = cursosMapPrev[m.Curso];
+                if (!curso) continue;
+
+                const whereAlunoPrev = {
+                    [Op.or]: [
+                        { aluno_id: m.id },
+                        { aluno: m.Nome, aluno_id: null }
+                    ]
+                };
+
+                if (curso.paga_mensal === 'sim') {
+                    const pagoMes = await Pagamentos.findOne({
+                        where: {
+                            ...whereAlunoPrev,
+                            tipo: 'mensalidade',
+                            status: 'pago',
+                            data_pagamento: {
+                                [Op.between]: [inicioMesStr, fimMesStr]
+                            }
+                        }
+                    });
+                    if (!pagoMes) {
+                        previsaoMesCurso += parseFloat(curso.Valor_curso) || 0;
+                    }
+                } else {
+                    const pendenteMes = await Pagamentos.sum('valor', {
+                        where: {
+                            ...whereAlunoPrev,
+                            status: ['pendente', 'parcial'],
+                            tipo: { [Op.ne]: 'venda' },
+                            data_vencimento: {
+                                [Op.between]: [inicioMesStr, fimMesStr]
+                            }
+                        }
+                    }) || 0;
+                    if (pendenteMes > 0) {
+                        previsaoMesCurso += parseFloat(pendenteMes);
+                    }
+                }
             }
         } catch (e) {
-            console.warn("Erro ao calcular previsão por curso:", e.message);
+            console.warn("Erro ao calcular previsão do mês:", e.message);
         }
 
         const totalPago = await Pagamentos.sum('valor', {
