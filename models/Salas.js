@@ -42,7 +42,7 @@ const Salas = sequelize.define("Salas", {
         }
     },
     Status: {
-        type: Sequelize.ENUM("Disponível", "Ocupada", "Em manutenção"),
+        type: Sequelize.ENUM("Disponível", "Ocupada", "Em manutenção", "Reservada"),
         defaultValue: "Disponível",
         allowNull: false
     }

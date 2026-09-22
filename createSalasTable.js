@@ -22,7 +22,7 @@ async function createSalasTable() {
                 \`Localizacao\` VARCHAR(100),
                 \`Preco_Hora\` DECIMAL(10,2) NOT NULL DEFAULT 0,
                 \`Preco_Dia\` DECIMAL(10,2) NOT NULL DEFAULT 0,
-                \`Status\` ENUM('Disponível','Ocupada','Em manutenção') NOT NULL DEFAULT 'Disponível',
+                \`Status\` ENUM('Disponível','Ocupada','Em manutenção','Reservada') NOT NULL DEFAULT 'Disponível',
                 \`createdAt\` DATETIME NOT NULL,
                 \`updatedAt\` DATETIME NOT NULL,
                 PRIMARY KEY (\`id\`)
