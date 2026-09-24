@@ -227,36 +227,48 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
             where: { status: 'pago' }
         });
 
-        const hoje = new Date().toISOString().split('T')[0];
-        const totalAtraso = await Pagamentos.sum('valor', {
-            where: { 
-                tipo: { [Op.ne]: 'venda' },
-                [Op.or]: [
-                    { status: 'parcial' },
-                    { 
-                        status: 'pendente',
-                        [Op.or]: [
-                            { data_vencimento: { [Op.lt]: hoje } },
-                            { data_vencimento: null }
-                        ]
-                    }
-                ]
-            }
+        // O "total em atraso"/dívida deve ser o que FALTA pagar pelo curso
+        // (total do curso - valor já recebido) e não o valor que o formando
+        // já pagou de forma parcial.
+        const cursosAtraso = await Cursos.findAll({
+            attributes: ['Nome', 'Valor_curso', 'Modulos', 'paga_mensal']
+        });
+        const cursosMapAtraso = {};
+        const cursosMensaisSet = {};
+        cursosAtraso.forEach(function (c) {
+            const mensal = c.paga_mensal === 'sim';
+            if (mensal) cursosMensaisSet[c.Nome] = true;
+            cursosMapAtraso[c.Nome] = mensal
+                ? (parseFloat(c.Valor_curso) || 0) * (parseInt(c.Modulos) || 1)
+                : (parseFloat(c.Valor_curso) || 0);
         });
 
-        const inadimplentesList = await Pagamentos.findAll({
-            where: { 
+        // Total já recebido por formando/curso (pagamentos efectivos)
+        const recebidoAtrasoRows = await Pagamentos.findAll({
+            where: {
                 tipo: { [Op.ne]: 'venda' },
-                [Op.or]: [
-                    { status: 'parcial' },
-                    { 
-                        status: 'pendente',
-                        [Op.or]: [
-                            { data_vencimento: { [Op.lt]: hoje } },
-                            { data_vencimento: null }
-                        ]
-                    }
-                ]
+                status: { [Op.in]: ['pago', 'parcial'] }
+            },
+            attributes: [
+                'aluno',
+                'aluno_id',
+                'curso',
+                [sequelize.fn('SUM', sequelize.col('valor')), 'recebido']
+            ],
+            group: ['aluno', 'aluno_id', 'curso']
+        });
+        const recebidoAtrasoMap = {};
+        recebidoAtrasoRows.forEach(function (r) {
+            recebidoAtrasoMap[(r.aluno || '') + '\u0000' + (r.curso || '')] = parseFloat(r.get('recebido')) || 0;
+        });
+
+        // Todo pagamento 'pendente' ou 'parcial' com valor é dinheiro que o
+        // formando deve pagar, independentemente da data de vencimento.
+        const inadimplentesList = await Pagamentos.findAll({
+            where: {
+                tipo: { [Op.ne]: 'venda' },
+                status: { [Op.in]: ['pendente', 'parcial'] },
+                valor: { [Op.gt]: 0 }
             },
             attributes: [
                 'aluno', 
@@ -269,7 +281,59 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
             order: [[sequelize.fn('SUM', sequelize.col('valor')), 'DESC']]
         });
 
-        const totalInadimplentes = inadimplentesList.length;
+        let totalAtrasoCalc = 0;
+        const inadimplentesDetalhados = await Promise.all(inadimplentesList.map(async (item) => {
+            // Cursos com pagamento mensal (ex.: Inglês) têm a dívida tratada no
+            // separador "Dívidas" e ficam de fora do total em atraso.
+            if (cursosMensaisSet[item.curso]) {
+                return null;
+            }
+
+            const pagamentos = await Pagamentos.findAll({
+                where: {
+                    aluno: item.aluno,
+                    curso: item.curso,
+                    status: ['pendente', 'parcial']
+                },
+                attributes: ['valor', 'data_vencimento', 'status']
+            });
+
+            const chaveAtraso = (item.aluno || '') + '\u0000' + (item.curso || '');
+            const totalCursoAtraso = cursosMapAtraso[item.curso];
+            const recebidoAtraso = recebidoAtrasoMap[chaveAtraso] || 0;
+            // Dívida = o que FALTA pagar pelo curso (valor do curso - o que já
+            // recebeu, incluindo pagamentos parciais). Nunca a soma dos parciais.
+            const debitoCurso = totalCursoAtraso !== undefined
+                ? Math.max(0, totalCursoAtraso - recebidoAtraso)
+                : pagamentos
+                    .filter(p => p.status === 'pendente')
+                    .reduce((sum, p) => sum + parseFloat(p.valor), 0);
+
+            const diasAtraso = pagamentos.reduce((max, p) => {
+                if (p.data_vencimento) {
+                    const vencimento = new Date(p.data_vencimento);
+                    const diff = Math.floor((new Date() - vencimento) / (1000 * 60 * 60 * 24));
+                    return Math.max(max, diff);
+                }
+                return max;
+            }, 0);
+
+            totalAtrasoCalc += debitoCurso;
+
+            return {
+                id: item.aluno_id || item.id,
+                nome: item.aluno,
+                curso: item.curso,
+                debito: debitoCurso,
+                dias_atraso: diasAtraso,
+                qtd_pagamentos: parseInt(item.get('qtd_pagamentos'))
+            };
+        }));
+
+        const inadimplentesValidos = inadimplentesDetalhados.filter(function (d) { return d && d.debito > 0; });
+        const totalInadimplentes = inadimplentesValidos.length;
+
+        const totalAtraso = totalAtrasoCalc;
 
         const inicioMes = new Date();
         inicioMes.setDate(1);
@@ -420,36 +484,6 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
             };
         }));
 
-        const inadimplentesDetalhados = await Promise.all(inadimplentesList.map(async (item) => {
-            const pagamentos = await Pagamentos.findAll({
-                where: {
-                    aluno: item.aluno,
-                    status: ['pendente', 'parcial']
-                },
-                attributes: ['valor', 'data_vencimento']
-            });
-
-            const totalDebito = pagamentos.reduce((sum, p) => sum + parseFloat(p.valor), 0);
-            const diasAtraso = pagamentos.reduce((max, p) => {
-                if (p.data_vencimento) {
-                    const vencimento = new Date(p.data_vencimento);
-                    const hoje2 = new Date();
-                    const diff = Math.floor((hoje2 - vencimento) / (1000 * 60 * 60 * 24));
-                    return Math.max(max, diff);
-                }
-                return max;
-            }, 0);
-
-            return {
-                id: item.aluno_id || item.id,
-                nome: item.aluno,
-                curso: item.curso,
-                debito: totalDebito,
-                dias_atraso: diasAtraso,
-                qtd_pagamentos: parseInt(item.get('qtd_pagamentos'))
-            };
-        }));
-
         return res.status(200).json({
             success: true,
             data: {
@@ -457,7 +491,7 @@ router_pagamentos.get("/financeiro/stats", async (req, res) => {
                 totalDinheiro: totalDinheiro || 0,
                 totalAtraso: totalAtraso || 0,
                 inadimplentes: totalInadimplentes,
-                inadimplentesList: inadimplentesDetalhados,
+                inadimplentesList: inadimplentesValidos,
                 previsaoMes: previsaoMesCurso || 0,
                 saldoCaixa: saldoCaixa || 0,
                 totalSaidas: totalSaidas,
@@ -539,7 +573,8 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 //   partir do dia 6 do próprio mês, a mensalidade não paga é considerada dívida.
 // - Acréscimo de ACRESCIMO_ATRASO (Kz) na mensalidade não paga até ao dia 15
 //   do mês de referência.
-// - Cada pagamento cobre apenas UM mês (o mês da data de pagamento).
+// - O valor recebido (pago/parcial) abate os meses mais antigos primeiro,
+//   cobrindo pagamentos antecipados (curso pago inteiro) e parciais.
 // - total_meses_divida = meses distintos em dívida (não meses x alunos).
 var ACRESCIMO_ATRASO = 3000;
 router_pagamentos.get("/dividas", async (req, res) => {
@@ -619,16 +654,11 @@ router_pagamentos.get("/dividas", async (req, res) => {
                 },
                 attributes: ['id', 'data_pagamento', 'data_vencimento', 'valor', 'status']
             });
-            var mesesPagos = {};
+            // Valor recebido (pago/parcial) para abater os meses mais antigos
+            var saldoRestante = 0;
             pagamentos.forEach(function (p) {
-                // Cada pagamento cobre UM mês: o mês da data de pagamento.
-                // Se não existir data de pagamento, usa o mês do vencimento.
-                var fonte = p.data_pagamento || (p.status === 'pago' ? p.data_vencimento : null);
-                if (fonte) {
-                    var dt = new Date(fonte);
-                    if (!isNaN(dt.getTime())) {
-                        mesesPagos[dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0')] = true;
-                    }
+                if (p.status === 'pago' || p.status === 'parcial') {
+                    saldoRestante += parseFloat(p.valor) || 0;
                 }
             });
 
@@ -640,7 +670,8 @@ router_pagamentos.get("/dividas", async (req, res) => {
                 var venc = new Date(ref.y, ref.m - 1, 5);
                 var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
                 var dataVencStr = refKey + '-05';
-                var pago = !!mesesPagos[refKey];
+                var pago = saldoRestante >= valorMensal;
+                if (pago) saldoRestante -= valorMensal;
 
                 var passouDia6 = (ref.y < anoAtual) ||
                     (ref.y === anoAtual && (ref.m < mesAtual || (ref.m === mesAtual && diaAtual >= 6)));
