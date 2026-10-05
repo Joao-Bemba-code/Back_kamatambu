@@ -57,5 +57,15 @@ module.exports = {
             });
         }
         return next();
+    },
+
+    requireAdminOrTesouraria: async (req, res, next) => {
+        if (!req.user || !(req.user.eAdmin || req.user.tipo === 'tesouraria')) {
+            return res.status(403).json({
+                success: false,
+                message: "Acesso restrito a administradores ou tesouraria"
+            });
+        }
+        return next();
     }
 };

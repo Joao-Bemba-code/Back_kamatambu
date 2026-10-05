@@ -1,8 +1,8 @@
-const express = require("express");
+﻿const express = require("express");
 const { Sequelize, sequelize } = require("../config/index.js");
 const router_estoque = express.Router();
 const { Produtos, Movimentos, Requisicoes, RequisicaoItens, Saidas } = require("../models/index.js");
-const { requireAdmin } = require("../protect/index.js");
+const { requireAdmin, requireAdminOrTesouraria } = require("../protect/index.js");
 
 const hoje = () => new Date().toISOString().split("T")[0];
 
@@ -19,7 +19,7 @@ async function registarMovimento(dados, transaction) {
     });
 
     if (!produto) {
-        var erro = new Error("Produto não encontrado");
+        var erro = new Error("Produto nÃ£o encontrado");
         erro.status = 404;
         throw erro;
     }
@@ -34,7 +34,7 @@ async function registarMovimento(dados, transaction) {
         posterior = anterior + quantidade;
     } else {
         if (quantidade > anterior) {
-            var erro = new Error(`Stock insuficiente de "${produto.nome}". Disponível: ${anterior} ${produto.unidade}`);
+            var erro = new Error(`Stock insuficiente de "${produto.nome}". DisponÃ­vel: ${anterior} ${produto.unidade}`);
             erro.status = 400;
             throw erro;
         }
@@ -42,7 +42,7 @@ async function registarMovimento(dados, transaction) {
     }
 
     if (posterior < 0) {
-        var erroNeg = new Error("O stock não pode ficar negativo");
+        var erroNeg = new Error("O stock nÃ£o pode ficar negativo");
         erroNeg.status = 400;
         throw erroNeg;
     }
@@ -173,7 +173,7 @@ router_estoque.get("/produtos/:id", async (req, res) => {
         var produto = await Produtos.findByPk(req.params.id);
 
         if (!produto) {
-            return res.status(404).json({ success: false, message: "Produto não encontrado" });
+            return res.status(404).json({ success: false, message: "Produto nÃ£o encontrado" });
         }
 
         var movimentos = await Movimentos.findAll({
@@ -210,13 +210,13 @@ router_estoque.post("/produtos", requireAdmin, async (req, res) => {
         var { nome, codigo, categoria, unidade, preco_custo, stock_atual, stock_minimo, localizacao, observacao } = req.body;
 
         if (!nome || !nome.trim()) {
-            return res.status(400).json({ success: false, message: "O nome do produto é obrigatório" });
+            return res.status(400).json({ success: false, message: "O nome do produto Ã© obrigatÃ³rio" });
         }
 
         if (codigo) {
             var existe = await Produtos.findOne({ where: { codigo: codigo.trim() } });
             if (existe) {
-                return res.status(400).json({ success: false, message: "Já existe um produto com este código" });
+                return res.status(400).json({ success: false, message: "JÃ¡ existe um produto com este cÃ³digo" });
             }
         }
 
@@ -244,7 +244,7 @@ router_estoque.put("/produtos/:id", requireAdmin, async (req, res) => {
         var produto = await Produtos.findByPk(req.params.id);
 
         if (!produto) {
-            return res.status(404).json({ success: false, message: "Produto não encontrado" });
+            return res.status(404).json({ success: false, message: "Produto nÃ£o encontrado" });
         }
 
         var { nome, codigo, categoria, unidade, preco_custo, stock_minimo, localizacao, ativo, observacao } = req.body;
@@ -272,7 +272,7 @@ router_estoque.delete("/produtos/:id", requireAdmin, async (req, res) => {
         var produto = await Produtos.findByPk(req.params.id);
 
         if (!produto) {
-            return res.status(404).json({ success: false, message: "Produto não encontrado" });
+            return res.status(404).json({ success: false, message: "Produto nÃ£o encontrado" });
         }
 
         var movimentos = await Movimentos.count({ where: { produto_id: produto.id } });
@@ -334,7 +334,7 @@ router_estoque.post("/movimentos", requireAdmin, async (req, res) => {
             return res.status(400).json({ success: false, message: "Escolha o produto" });
         }
         if (!tipo || ["entrada", "saida", "ajuste", "devolucao", "perda"].indexOf(tipo) === -1) {
-            return res.status(400).json({ success: false, message: "Tipo de movimento inválido" });
+            return res.status(400).json({ success: false, message: "Tipo de movimento invÃ¡lido" });
         }
         if (!quantidade || parseInt(quantidade) <= 0) {
             return res.status(400).json({ success: false, message: "A quantidade deve ser maior que zero" });
@@ -396,7 +396,7 @@ router_estoque.post("/movimentos/lote", requireAdmin, async (req, res) => {
         if (movimentos.length === 0) {
             await transaction.rollback();
             transaction = null;
-            return res.status(400).json({ success: false, message: "Nenhum item válido no lote" });
+            return res.status(400).json({ success: false, message: "Nenhum item vÃ¡lido no lote" });
         }
 
         await transaction.commit();
@@ -413,7 +413,7 @@ router_estoque.post("/movimentos/lote", requireAdmin, async (req, res) => {
     }
 });
 
-// ================= REQUISIÇÕES =================
+// ================= REQUISIÃ‡Ã•ES =================
 router_estoque.get("/requisicoes", async (req, res) => {
     try {
         var { estado, de, ate } = req.query;
@@ -442,7 +442,7 @@ router_estoque.get("/requisicoes", async (req, res) => {
 
         return res.status(200).json({ success: true, count: lista.length, data: lista });
     } catch (error) {
-        return responderErro(res, error, "Erro ao listar requisições:");
+        return responderErro(res, error, "Erro ao listar requisiÃ§Ãµes:");
     }
 });
 
@@ -451,14 +451,14 @@ router_estoque.get("/requisicoes/:id", async (req, res) => {
         var requisicao = await Requisicoes.findByPk(req.params.id);
 
         if (!requisicao) {
-            return res.status(404).json({ success: false, message: "Requisição não encontrada" });
+            return res.status(404).json({ success: false, message: "RequisiÃ§Ã£o nÃ£o encontrada" });
         }
 
         var itens = await RequisicaoItens.findAll({ where: { requisicao_id: requisicao.id } });
 
         return res.status(200).json({ success: true, data: Object.assign(requisicao.toJSON(), { itens: itens }) });
     } catch (error) {
-        return responderErro(res, error, "Erro ao carregar requisição:");
+        return responderErro(res, error, "Erro ao carregar requisiÃ§Ã£o:");
     }
 });
 
@@ -468,7 +468,7 @@ router_estoque.post("/requisicoes", async (req, res) => {
         var { itens, tipo, setor, turma, observacao, solicitante } = req.body;
 
         if (!Array.isArray(itens) || itens.length === 0) {
-            return res.status(400).json({ success: false, message: "Adicione pelo menos um produto à requisição" });
+            return res.status(400).json({ success: false, message: "Adicione pelo menos um produto Ã  requisiÃ§Ã£o" });
         }
 
         transaction = await sequelize.transaction();
@@ -482,17 +482,17 @@ router_estoque.post("/requisicoes", async (req, res) => {
 
             var produto = await Produtos.findByPk(parseInt(item.produto_id), { transaction });
             if (!produto) {
-                var erroProd = new Error("Produto não encontrado na requisição");
+                var erroProd = new Error("Produto nÃ£o encontrado na requisiÃ§Ã£o");
                 erroProd.status = 400;
                 throw erroProd;
             }
             if (!produto.ativo) {
-                var erroAtivo = new Error(`O produto "${produto.nome}" está desactivado`);
+                var erroAtivo = new Error(`O produto "${produto.nome}" estÃ¡ desactivado`);
                 erroAtivo.status = 400;
                 throw erroAtivo;
             }
             if (parseInt(item.quantidade) > produto.stock_atual) {
-                var erroStock = new Error(`Stock insuficiente de "${produto.nome}". Disponível: ${produto.stock_atual} ${produto.unidade}`);
+                var erroStock = new Error(`Stock insuficiente de "${produto.nome}". DisponÃ­vel: ${produto.stock_atual} ${produto.unidade}`);
                 erroStock.status = 400;
                 throw erroStock;
             }
@@ -514,7 +514,7 @@ router_estoque.post("/requisicoes", async (req, res) => {
         if (linhas.length === 0) {
             await transaction.rollback();
             transaction = null;
-            return res.status(400).json({ success: false, message: "Nenhum item válido na requisição" });
+            return res.status(400).json({ success: false, message: "Nenhum item vÃ¡lido na requisiÃ§Ã£o" });
         }
 
         var requisicao = await Requisicoes.create({
@@ -543,26 +543,26 @@ router_estoque.post("/requisicoes", async (req, res) => {
 
         return res.status(201).json({
             success: true,
-            message: "Requisição submetida com sucesso",
+            message: "RequisiÃ§Ã£o submetida com sucesso",
             data: Object.assign(requisicao.toJSON(), { itens: linhas })
         });
     } catch (error) {
         if (transaction) await transaction.rollback();
-        return responderErro(res, error, "Erro ao criar requisição:");
+        return responderErro(res, error, "Erro ao criar requisiÃ§Ã£o:");
     }
 });
 
-router_estoque.put("/requisicoes/:id/aprovar", requireAdmin, async (req, res) => {
+router_estoque.put("/requisicoes/:id/aprovar", requireAdminOrTesouraria, async (req, res) => {
     var transaction = null;
     try {
         var requisicao = await Requisicoes.findByPk(req.params.id);
 
         if (!requisicao) {
-            return res.status(404).json({ success: false, message: "Requisição não encontrada" });
+            return res.status(404).json({ success: false, message: "RequisiÃ§Ã£o nÃ£o encontrada" });
         }
 
         if (requisicao.estado !== "pendente") {
-            return res.status(400).json({ success: false, message: `Requisição já está ${requisicao.estado}` });
+            return res.status(400).json({ success: false, message: `RequisiÃ§Ã£o jÃ¡ estÃ¡ ${requisicao.estado}` });
         }
 
         var itens = await RequisicaoItens.findAll({ where: { requisicao_id: requisicao.id } });
@@ -578,7 +578,7 @@ router_estoque.put("/requisicoes/:id/aprovar", requireAdmin, async (req, res) =>
                 data_saida: hoje(),
                 status: "pago",
                 forma_pagamento: "dinheiro",
-                observacao: `Requisição de ${requisicao.solicitante}${requisicao.setor ? " (" + requisicao.setor + ")" : ""}`,
+                observacao: `RequisiÃ§Ã£o de ${requisicao.solicitante}${requisicao.setor ? " (" + requisicao.setor + ")" : ""}`,
                 usuario_criou: req.user.nome
             }, { transaction });
         }
@@ -589,7 +589,7 @@ router_estoque.put("/requisicoes/:id/aprovar", requireAdmin, async (req, res) =>
                 tipo: "saida",
                 quantidade: itens[i].quantidade,
                 preco_unitario: itens[i].preco_unitario,
-                motivo: `Requisição ${requisicao.numero}`,
+                motivo: `RequisiÃ§Ã£o ${requisicao.numero}`,
                 documento: requisicao.numero,
                 data_movimento: hoje(),
                 requisicao_id: requisicao.id,
@@ -612,25 +612,25 @@ router_estoque.put("/requisicoes/:id/aprovar", requireAdmin, async (req, res) =>
 
         return res.status(200).json({
             success: true,
-            message: `Requisição ${requisicao.numero} aprovada. Stock actualizado.`,
+            message: `RequisiÃ§Ã£o ${requisicao.numero} aprovada. Stock actualizado.`,
             data: requisicao
         });
     } catch (error) {
         if (transaction) await transaction.rollback();
-        return responderErro(res, error, "Erro ao aprovar requisição:");
+        return responderErro(res, error, "Erro ao aprovar requisiÃ§Ã£o:");
     }
 });
 
-router_estoque.put("/requisicoes/:id/rejeitar", requireAdmin, async (req, res) => {
+router_estoque.put("/requisicoes/:id/rejeitar", requireAdminOrTesouraria, async (req, res) => {
     try {
         var requisicao = await Requisicoes.findByPk(req.params.id);
 
         if (!requisicao) {
-            return res.status(404).json({ success: false, message: "Requisição não encontrada" });
+            return res.status(404).json({ success: false, message: "RequisiÃ§Ã£o nÃ£o encontrada" });
         }
 
         if (requisicao.estado !== "pendente") {
-            return res.status(400).json({ success: false, message: `Requisição já está ${requisicao.estado}` });
+            return res.status(400).json({ success: false, message: `RequisiÃ§Ã£o jÃ¡ estÃ¡ ${requisicao.estado}` });
         }
 
         await requisicao.update({
@@ -640,9 +640,9 @@ router_estoque.put("/requisicoes/:id/rejeitar", requireAdmin, async (req, res) =
             motivo_decisao: req.body.motivo_decisao || null
         });
 
-        return res.status(200).json({ success: true, message: "Requisição rejeitada", data: requisicao });
+        return res.status(200).json({ success: true, message: "RequisiÃ§Ã£o rejeitada", data: requisicao });
     } catch (error) {
-        return responderErro(res, error, "Erro ao rejeitar requisição:");
+        return responderErro(res, error, "Erro ao rejeitar requisiÃ§Ã£o:");
     }
 });
 
@@ -651,18 +651,18 @@ router_estoque.put("/requisicoes/:id/cancelar", async (req, res) => {
         var requisicao = await Requisicoes.findByPk(req.params.id);
 
         if (!requisicao) {
-            return res.status(404).json({ success: false, message: "Requisição não encontrada" });
+            return res.status(404).json({ success: false, message: "RequisiÃ§Ã£o nÃ£o encontrada" });
         }
 
         if (requisicao.estado !== "pendente") {
-            return res.status(400).json({ success: false, message: "Só é possível cancelar requisições pendentes" });
+            return res.status(400).json({ success: false, message: "SÃ³ Ã© possÃ­vel cancelar requisiÃ§Ãµes pendentes" });
         }
 
         await requisicao.update({ estado: "cancelada", data_decisao: hoje(), decidido_por: req.user.nome });
 
-        return res.status(200).json({ success: true, message: "Requisição cancelada", data: requisicao });
+        return res.status(200).json({ success: true, message: "RequisiÃ§Ã£o cancelada", data: requisicao });
     } catch (error) {
-        return responderErro(res, error, "Erro ao cancelar requisição:");
+        return responderErro(res, error, "Erro ao cancelar requisiÃ§Ã£o:");
     }
 });
 
