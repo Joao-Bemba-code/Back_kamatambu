@@ -279,9 +279,10 @@ router_estoque.delete("/produtos/:id", requireAdmin, async (req, res) => {
 
         if (movimentos > 0) {
             await produto.update({ ativo: false });
+            await Movimentos.update({ ativo: false }, { where: { produto_id: produto.id, ativo: true } });
             return res.status(200).json({
                 success: true,
-                message: "Produto desactivado (possui movimientos registados)"
+                message: "Produto desactivado (possui movimentos registados)"
             });
         }
 
@@ -296,9 +297,10 @@ router_estoque.delete("/produtos/:id", requireAdmin, async (req, res) => {
 // ================= MOVIMENTOS =================
 router_estoque.get("/movimentos", async (req, res) => {
     try {
-        var { produto_id, tipo, de, ate, limite } = req.query;
+        var { produto_id, tipo, de, ate, limite, incluir_inactivos } = req.query;
         var where = {};
 
+        if (incluir_inactivos !== "true") where.ativo = true;
         if (produto_id) where.produto_id = produto_id;
         if (tipo) where.tipo = tipo;
         filtroData(where, "data_movimento", de, ate);
