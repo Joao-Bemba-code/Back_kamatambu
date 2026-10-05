@@ -11,6 +11,12 @@ const CriteriosAvaliacao = require("./CriteriosAvaliacao.js");
 const Saidas = require("./Saidas.js");
 const Salas = require("./Salas.js");
 const Alugueres = require("./Alugueres.js");
+const Produtos = require("./Produtos.js");
+const Movimentos = require("./Movimentos.js");
+const Requisicoes = require("./Requisicoes.js");
+const RequisicaoItens = require("./RequisicaoItens.js");
+
+Requisicoes.hasMany(RequisicaoItens, { as: "itens", foreignKey: "requisicao_id" });
 
 module.exports = {
     Users,
@@ -25,5 +31,9 @@ module.exports = {
     CriteriosAvaliacao,
     Saidas,
     Salas,
-    Alugueres
+    Alugueres,
+    Produtos,
+    Movimentos,
+    Requisicoes,
+    RequisicaoItens
 };

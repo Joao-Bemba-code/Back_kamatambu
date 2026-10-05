@@ -19,6 +19,7 @@ var saidasRoutes = require("./routers/saidas.js");
 var salasRoutes = require("./routers/salas.js");
 var alugueresRoutes = require("./routers/alugueres.js");
 var uploadRouter = require("./routers/upload.js");
+var estoqueRoutes = require("./routers/estoque.js");
 
 var app = express();
 var port = process.env.port || 8080;
@@ -51,6 +52,7 @@ app.use("/api/saidas", authenticate, saidasRoutes);
 app.use("/api/salas", authenticate, salasRoutes);
 app.use("/api/alugueres", authenticate, alugueresRoutes);
 app.use("/api/upload", authenticate, uploadRouter);
+app.use("/api/estoque", authenticate, estoqueRoutes);
 
 // Rotas protegidas sem prefixo /api (compatibilidade com frontend)
 app.use("/formadores", authenticate, formadoresRoutes);
@@ -65,6 +67,7 @@ app.use("/saidas", authenticate, saidasRoutes);
 app.use("/salas", authenticate, salasRoutes);
 app.use("/alugueres", authenticate, alugueresRoutes);
 app.use("/upload", authenticate, uploadRouter);
+app.use("/estoque", authenticate, estoqueRoutes);
 
 // Rotas publicas
 app.get("/test", (req, res) => {
