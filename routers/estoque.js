@@ -205,7 +205,7 @@ router_estoque.get("/categorias", async (req, res) => {
     }
 });
 
-router_estoque.post("/produtos", requireAdmin, async (req, res) => {
+router_estoque.post("/produtos", requireAdminOrTesouraria, async (req, res) => {
     try {
         var { nome, codigo, categoria, unidade, preco_custo, stock_atual, stock_minimo, localizacao, observacao } = req.body;
 
@@ -239,7 +239,7 @@ router_estoque.post("/produtos", requireAdmin, async (req, res) => {
     }
 });
 
-router_estoque.put("/produtos/:id", requireAdmin, async (req, res) => {
+router_estoque.put("/produtos/:id", requireAdminOrTesouraria, async (req, res) => {
     try {
         var produto = await Produtos.findByPk(req.params.id);
 
@@ -267,7 +267,7 @@ router_estoque.put("/produtos/:id", requireAdmin, async (req, res) => {
     }
 });
 
-router_estoque.delete("/produtos/:id", requireAdmin, async (req, res) => {
+router_estoque.delete("/produtos/:id", requireAdminOrTesouraria, async (req, res) => {
     try {
         var produto = await Produtos.findByPk(req.params.id);
 
@@ -327,7 +327,7 @@ router_estoque.get("/movimentos", async (req, res) => {
     }
 });
 
-router_estoque.post("/movimentos", requireAdmin, async (req, res) => {
+router_estoque.post("/movimentos", requireAdminOrTesouraria, async (req, res) => {
     var transaction = null;
     try {
         var { produto_id, tipo, quantidade, preco_unitario, documento, motivo, data_movimento, observacao } = req.body;
@@ -366,7 +366,7 @@ router_estoque.post("/movimentos", requireAdmin, async (req, res) => {
 });
 
 // Entrada de varios produtos de uma vez (compra/recebimento)
-router_estoque.post("/movimentos/lote", requireAdmin, async (req, res) => {
+router_estoque.post("/movimentos/lote", requireAdminOrTesouraria, async (req, res) => {
     var transaction = null;
     try {
         var { itens, documento, data_movimento, observacao } = req.body;
