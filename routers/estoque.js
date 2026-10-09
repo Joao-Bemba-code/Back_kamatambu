@@ -24,12 +24,6 @@ async function registarMovimento(dados, transaction) {
         throw erro;
     }
 
-    if (produto.controla_stock === false) {
-        var erroControla = new Error(`O produto "${produto.nome}" não movimenta estoque`);
-        erroControla.status = 400;
-        throw erroControla;
-    }
-
     var quantidade = parseInt(dados.quantidade);
     var anterior = produto.stock_atual;
     var posterior = anterior;
@@ -212,27 +206,19 @@ router_estoque.get("/categorias", async (req, res) => {
 });
 
 router_estoque.post("/produtos", requireAdminOrTesouraria, async (req, res) => {
-    var transaction = null;
     try {
-        var { nome, codigo, categoria, unidade, preco_custo, stock_atual, stock_minimo, localizacao, observacao, controla_stock } = req.body;
+        var { nome, codigo, categoria, unidade, preco_custo, stock_atual, stock_minimo, localizacao, observacao } = req.body;
 
         if (!nome || !nome.trim()) {
-            return res.status(400).json({ success: false, message: "O nome do produto é obrigatório" });
+            return res.status(400).json({ success: false, message: "O nome do produto Ã© obrigatÃ³rio" });
         }
 
         if (codigo) {
             var existe = await Produtos.findOne({ where: { codigo: codigo.trim() } });
             if (existe) {
-                return res.status(400).json({ success: false, message: "Já existe um produto com este código" });
+                return res.status(400).json({ success: false, message: "JÃ¡ existe um produto com este cÃ³digo" });
             }
         }
-
-        var controla = !(controla_stock === false || controla_stock === "false" || controla_stock === 0 || controla_stock === "0");
-
-        var stockInicial = controla && stock_atual ? parseInt(stock_atual) : 0;
-        if (isNaN(stockInicial) || stockInicial < 0) stockInicial = 0;
-
-        transaction = await sequelize.transaction();
 
         var novo = await Produtos.create({
             nome: nome.trim(),
@@ -240,47 +226,15 @@ router_estoque.post("/produtos", requireAdminOrTesouraria, async (req, res) => {
             categoria: categoria || "Geral",
             unidade: unidade || "un",
             preco_custo: preco_custo ? parseFloat(preco_custo) : 0,
-            stock_atual: 0,
-            stock_minimo: controla ? (stock_minimo ? parseInt(stock_minimo) : 0) : 0,
-            controla_stock: controla,
+            stock_atual: stock_atual ? parseInt(stock_atual) : 0,
+            stock_minimo: stock_minimo ? parseInt(stock_minimo) : 0,
             localizacao: localizacao || null,
             observacao: observacao || null,
             usuario_criou: req.user.nome
-        }, { transaction });
-
-        var movimentoInicial = null;
-        if (controla && stockInicial > 0) {
-            movimentoInicial = await registarMovimento({
-                produto_id: novo.id,
-                tipo: "entrada",
-                quantidade: stockInicial,
-                preco_unitario: novo.preco_custo,
-                motivo: "Stock inicial",
-                documento: "Stock inicial",
-                data_movimento: hoje(),
-                usuario_criou: req.user.nome
-            }, transaction);
-        }
-
-        await transaction.commit();
-        transaction = null;
-
-        var resposta = Object.assign(novo.toJSON(), {
-            stock_atual: stockInicial,
-            movimento_inicial: movimentoInicial
         });
 
-        return res.status(201).json({
-            success: true,
-            message: !controla
-                ? "Produto criado com sucesso (sem controlo de stock)"
-                : (movimentoInicial
-                    ? "Produto criado com sucesso (entrada de stock inicial registada automaticamente)"
-                    : "Produto criado com sucesso"),
-            data: resposta
-        });
+        return res.status(201).json({ success: true, message: "Produto criado com sucesso", data: novo });
     } catch (error) {
-        if (transaction) await transaction.rollback();
         return responderErro(res, error, "Erro ao criar produto:");
     }
 });
@@ -293,7 +247,7 @@ router_estoque.put("/produtos/:id", requireAdminOrTesouraria, async (req, res) =
             return res.status(404).json({ success: false, message: "Produto nÃ£o encontrado" });
         }
 
-        var { nome, codigo, categoria, unidade, preco_custo, stock_minimo, localizacao, ativo, observacao, controla_stock } = req.body;
+        var { nome, codigo, categoria, unidade, preco_custo, stock_minimo, localizacao, ativo, observacao } = req.body;
 
         await produto.update({
             nome: nome ? nome.trim() : produto.nome,
@@ -302,7 +256,6 @@ router_estoque.put("/produtos/:id", requireAdminOrTesouraria, async (req, res) =
             unidade: unidade || produto.unidade,
             preco_custo: preco_custo !== undefined && preco_custo !== "" ? parseFloat(preco_custo) : produto.preco_custo,
             stock_minimo: stock_minimo !== undefined && stock_minimo !== "" ? parseInt(stock_minimo) : produto.stock_minimo,
-            controla_stock: controla_stock !== undefined ? !(controla_stock === false || controla_stock === "false") : produto.controla_stock,
             localizacao: localizacao !== undefined ? localizacao : produto.localizacao,
             ativo: ativo !== undefined ? !!ativo : produto.ativo,
             observacao: observacao !== undefined ? observacao : produto.observacao
@@ -374,6 +327,45 @@ router_estoque.get("/movimentos", async (req, res) => {
     }
 });
 
+router_estoque.post("/movimentos", requireAdminOrTesouraria, async (req, res) => {
+    var transaction = null;
+    try {
+        var { produto_id, tipo, quantidade, preco_unitario, documento, motivo, data_movimento, observacao } = req.body;
+
+        if (!produto_id) {
+            return res.status(400).json({ success: false, message: "Escolha o produto" });
+        }
+        if (!tipo || ["entrada", "saida", "ajuste", "devolucao", "perda"].indexOf(tipo) === -1) {
+            return res.status(400).json({ success: false, message: "Tipo de movimento invÃ¡lido" });
+        }
+        if (!quantidade || parseInt(quantidade) <= 0) {
+            return res.status(400).json({ success: false, message: "A quantidade deve ser maior que zero" });
+        }
+
+        transaction = await sequelize.transaction();
+
+        var movimento = await registarMovimento({
+            produto_id: parseInt(produto_id),
+            tipo: tipo,
+            quantidade: parseInt(quantidade),
+            preco_unitario: preco_unitario,
+            documento: documento,
+            motivo: motivo,
+            data_movimento: data_movimento,
+            observacao: observacao,
+            usuario_criou: req.user.nome
+        }, transaction);
+
+        await transaction.commit();
+
+        return res.status(201).json({ success: true, message: "Movimento registado com sucesso", data: movimento });
+    } catch (error) {
+        if (transaction) await transaction.rollback();
+        return responderErro(res, error, "Erro ao registar movimento:");
+    }
+});
+
+// Entrada de varios produtos de uma vez (compra/recebimento)
 router_estoque.post("/movimentos/lote", requireAdminOrTesouraria, async (req, res) => {
     var transaction = null;
     try {
@@ -390,15 +382,13 @@ router_estoque.post("/movimentos/lote", requireAdminOrTesouraria, async (req, re
             var item = itens[i];
             if (!item.produto_id || !item.quantidade || parseInt(item.quantidade) <= 0) continue;
 
-            var tipoItem = ["entrada", "saida", "devolucao"].indexOf(item.tipo) !== -1 ? item.tipo : "entrada";
-
             movimentos.push(await registarMovimento({
                 produto_id: parseInt(item.produto_id),
-                tipo: tipoItem,
+                tipo: item.tipo || "entrada",
                 quantidade: parseInt(item.quantidade),
                 preco_unitario: item.preco_unitario,
                 documento: documento,
-                motivo: item.motivo || (tipoItem === "saida" ? "Saída de material" : "Recebimento"),
+                motivo: item.motivo || "Recebimento",
                 data_movimento: data_movimento,
                 observacao: observacao,
                 usuario_criou: req.user.nome
@@ -502,11 +492,6 @@ router_estoque.post("/requisicoes", async (req, res) => {
                 var erroAtivo = new Error(`O produto "${produto.nome}" estÃ¡ desactivado`);
                 erroAtivo.status = 400;
                 throw erroAtivo;
-            }
-            if (produto.controla_stock === false) {
-                var erroControla = new Error(`O produto "${produto.nome}" não movimenta estoque`);
-                erroControla.status = 400;
-                throw erroControla;
             }
             if (parseInt(item.quantidade) > produto.stock_atual) {
                 var erroStock = new Error(`Stock insuficiente de "${produto.nome}". DisponÃ­vel: ${produto.stock_atual} ${produto.unidade}`);
