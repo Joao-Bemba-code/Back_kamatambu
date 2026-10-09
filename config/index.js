@@ -1,5 +1,6 @@
 var dotenv = require('dotenv');
-dotenv.config({path:'../.env'});
+var path = require('path');
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 var {Name_database, User_database, Pass_database, Host_database, Lang_database, Port, CA_path} = process.env;
 
@@ -11,7 +12,7 @@ var sequelize = new Sequelize(Name_database, User_database, Pass_database, {
     port: Port ? parseInt(Port) : 4000,
     dialectOptions: {
         ssl: {
-            require: true,
+            minVersion: 'TLSv1.2',
             rejectUnauthorized: false,
             ...(CA_path && CA_path !== '<CA_PATH>' ? { ca: CA_path } : {})
         }
