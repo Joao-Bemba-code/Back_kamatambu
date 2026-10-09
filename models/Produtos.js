@@ -60,6 +60,11 @@ const Produtos = sequelize.define("Produtos", {
         allowNull: false,
         defaultValue: true
     },
+    controla_stock: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    },
     observacao: {
         type: Sequelize.TEXT,
         allowNull: true

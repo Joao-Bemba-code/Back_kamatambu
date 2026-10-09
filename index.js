@@ -20,9 +20,10 @@ var salasRoutes = require("./routers/salas.js");
 var alugueresRoutes = require("./routers/alugueres.js");
 var uploadRouter = require("./routers/upload.js");
 var estoqueRoutes = require("./routers/estoque.js");
+var { migrar } = require("./migrate.js");
 
 var app = express();
-var port = process.env.port || 8080;
+var port = process.env.APP_PORT || 8080;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
@@ -88,9 +89,18 @@ app.use((req, res) => {
     res.status(404).json({ error: "Rota não encontrada" });
 });
 
-app.listen(port, (e) => {
-    if (e) {
-        console.log('houve um erro ao executar server:', e);
-    }
-    console.log(`Server on na porta ${port}!`);
-});
+function iniciarServidor() {
+    app.listen(port, (e) => {
+        if (e) {
+            console.log('houve um erro ao executar server:', e);
+        }
+        console.log(`Server on na porta ${port}!`);
+    });
+}
+
+migrar()
+    .then(iniciarServidor)
+    .catch(function (error) {
+        console.error("Erro na migração, a arrancar mesmo assim:", error.message);
+        iniciarServidor();
+    });

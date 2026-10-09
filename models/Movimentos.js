@@ -80,6 +80,11 @@ const Movimentos = sequelize.define("Movimentos", {
     observacao: {
         type: Sequelize.TEXT,
         allowNull: true
+    },
+    ativo: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
     }
 }, {
     timestamps: true,
