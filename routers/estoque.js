@@ -24,8 +24,8 @@ async function registarMovimento(dados, transaction) {
         throw erro;
     }
 
-    if (produto.controla_stock === false) {
-        var erroCtrl = new Error(`O produto "${produto.nome}" nÃ£o movimenta estoque`);
+    if (produto.controla_stock === false && dados.tipo !== "entrada") {
+        var erroCtrl = new Error(`O produto "${produto.nome}" nÃ£o movimenta estoque: sÃ³ Ã© possÃ­vel registar entrada`);
         erroCtrl.status = 400;
         throw erroCtrl;
     }
