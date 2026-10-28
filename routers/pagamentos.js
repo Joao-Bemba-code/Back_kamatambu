@@ -569,10 +569,12 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 // - Os meses de referência vão do início da formação (data de início da turma
 //   activa ou, na falta, data de matrícula) até ao mês corrente, limitados ao
 //   número de modulos (meses) do curso.
-// - O vencimento de cada mensalidade é no dia 5 do mês de referência; a
-//   partir do dia 6 do próprio mês, a mensalidade não paga é considerada dívida.
-// - Acréscimo de ACRESCIMO_ATRASO (Kz) na mensalidade não paga até ao dia 15
-//   do mês de referência.
+// - O vencimento de cada mensalidade é no dia X do mês de referência, onde X
+//   é o dia do início da formação (ex.: turma começou dia 23 -> outubro vence
+//   a 23 de outubro).
+// - A mensalidade só é considerada dívida DEPOIS do dia 15 do mês SEGUINTE
+//   ao de referência (ex.: outubro só vira dívida a partir de 16 de novembro).
+// - Acréscimo de ACRESCIMO_ATRASO (Kz) quando a mensalidade passa a dívida.
 // - O valor recebido (pago/parcial) abate os meses mais antigos primeiro,
 //   cobrindo pagamentos antecipados (curso pago inteiro) e parciais.
 // - total_meses_divida = meses distintos em dívida (não meses x alunos).
@@ -663,23 +665,30 @@ router_pagamentos.get("/dividas", async (req, res) => {
             });
 
             // Dívida = meses de referência sem pagamento
-            // Vencimento no dia 5 do mês de referência; a partir do dia 6 do
-            // próprio mês, a mensalidade não paga é considerada dívida.
-            // Acréscimo de ACRESCIMO_ATRASO se não paga até ao dia 15.
+            // Vencimento no dia X (dia do início da formação) do mês de
+            // referência; só é considerada dívida DEPOIS do dia 15 do mês
+            // seguinte. Acréscimo de ACRESCIMO_ATRASO ao virar dívida.
+            var diaInicio = dataInicio.getDate();
             var meses = mesesRefs.map(function (ref) {
-                var venc = new Date(ref.y, ref.m - 1, 5);
+                // Se o mês de referência não tem o dia X (ex.: X=31 em
+                // fevereiro), vence no último dia desse mês
+                var ultimoDiaMes = new Date(ref.y, ref.m, 0).getDate();
+                var diaVenc = Math.min(diaInicio, ultimoDiaMes);
+                var venc = new Date(ref.y, ref.m - 1, diaVenc);
                 var refKey = ref.y + '-' + String(ref.m).padStart(2, '0');
-                var dataVencStr = refKey + '-05';
+                var dataVencStr = refKey + '-' + String(diaVenc).padStart(2, '0');
                 var pago = saldoRestante >= valorMensal;
                 if (pago) saldoRestante -= valorMensal;
 
-                var passouDia6 = (ref.y < anoAtual) ||
-                    (ref.y === anoAtual && (ref.m < mesAtual || (ref.m === mesAtual && diaAtual >= 6)));
-                var passouDia15 = (ref.y < anoAtual) ||
-                    (ref.y === anoAtual && (ref.m < mesAtual || (ref.m === mesAtual && diaAtual >= 16)));
+                // Mês seguinte ao de referência
+                var sy = ref.y, sm = ref.m + 1;
+                if (sm > 12) { sm = 1; sy++; }
+                // Dívida só DEPOIS do dia 15 do mês seguinte (a partir do dia 16)
+                var passouDia15Seguinte = (sy < anoAtual) ||
+                    (sy === anoAtual && (sm < mesAtual || (sm === mesAtual && diaAtual >= 16)));
 
-                var vencida = !pago && passouDia6;
-                var acrescimo = (!pago && passouDia15) ? ACRESCIMO_ATRASO : 0;
+                var vencida = !pago && passouDia15Seguinte;
+                var acrescimo = vencida ? ACRESCIMO_ATRASO : 0;
                 var valorMes = valorMensal + acrescimo;
 
                 return {
