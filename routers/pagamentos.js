@@ -566,9 +566,9 @@ router_pagamentos.get("/status/:status", async (req, res) => {
 // Lista os formandos ADMITIDOS/ATIVO cujas turmas estão activas e cujo curso
 // tem paga_mensal = 'sim'. Calcula as mensalidades em aberto dinamicamente:
 // - O valor de cada mensalidade é o Valor_curso do curso (pagamento mensal).
-// - Os meses de referência vão do início da formação (data de início da turma
-//   activa ou, na falta, data de matrícula) até ao mês corrente, limitados ao
-//   número de modulos (meses) do curso.
+// - Os meses de referência de cada formando vão do início da SUA cobrança
+//   (o mais recente entre o início da turma e a sua data de matrícula) até
+//   ao mês corrente, limitados ao número de modulos (meses) do curso.
 // - O vencimento de cada mensalidade é no dia X do mês de referência, onde X
 //   é o dia do início da formação (ex.: turma começou dia 23 -> outubro vence
 //   a 23 de outubro).
@@ -631,12 +631,18 @@ router_pagamentos.get("/dividas", async (req, res) => {
             var modulos = info ? info.Modulos : 1;
             var valorMensal = parseFloat(info.Valor_curso) || 0;
 
-            // Meses de referência: do início da formação (início da turma activa,
-            // ou data de matrícula como alternativa) até ao mês corrente
-            // (inclusive), limitado ao número de modulos (meses) do curso
+            // Meses de referência: do início da cobrança DESTE formando (o mais
+            // recente entre o início da turma e a data de matrícula — quem se
+            // matricula a meio da formação não deve meses anteriores) até ao
+            // mês corrente (inclusive), limitado ao número de modulos (meses)
+            // do curso
             var mesesRefs = [];
-            var dataInicio = turmaInfo[m.Turma] ? new Date(turmaInfo[m.Turma]) : (m.Data_Matricula ? new Date(m.Data_Matricula) : new Date());
-            if (isNaN(dataInicio.getTime())) dataInicio = new Date();
+            var dataTurma = turmaInfo[m.Turma] ? new Date(turmaInfo[m.Turma]) : null;
+            var dataMatr = m.Data_Matricula ? new Date(m.Data_Matricula) : null;
+            if (dataTurma && isNaN(dataTurma.getTime())) dataTurma = null;
+            if (dataMatr && isNaN(dataMatr.getTime())) dataMatr = null;
+            var dataInicio = dataTurma || dataMatr || new Date();
+            if (dataMatr && dataMatr > dataInicio) dataInicio = dataMatr;
             var cy = dataInicio.getFullYear();
             var cm = dataInicio.getMonth() + 1;
             while ((cy < anoAtual || (cy === anoAtual && cm <= mesAtual)) && mesesRefs.length < modulos) {
